@@ -1,5 +1,7 @@
 ### Hi there 👋
 
+🔭 I’m currently working on making products and services around LLMs (Large Language Models).
+
 <!--
 **angadsinghsandhu/angadsinghsandhu** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
 
