@@ -20,13 +20,13 @@
 ## 🏆 GitHub Trophies
 ![](https://github-profile-trophy.vercel.app/?username=angadsinghsandhu&theme=onedark&no-frame=false&no-bg=false&margin-w=4)
 
-## 🐦 Latest Tweet
+<!-- ## 🐦 Latest Tweet
 [![](https://gtce.itsvg.in/api?username=angadsandhuwork)](https://github.com/VishwaGauravIn/github-twitter-card-embed)
 
 ### ✍️ Random Dev Quote
-![](https://quotes-github-readme.vercel.app/api?type=horizontal&theme=dark)
+![](https://quotes-github-readme.vercel.app/api?type=horizontal&theme=dark) -->
 
-### 🔝 Top Contributed Repo
+## 🔝 Top Contributed Repo
 ![](https://github-contributor-stats.vercel.app/api?username=angadsinghsandhu&limit=5&theme=onedark&combine_all_yearly_contributions=true)
 
 ---
