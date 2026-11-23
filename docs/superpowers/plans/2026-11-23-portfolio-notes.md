@@ -69,11 +69,11 @@ The exporter is implemented once, in Notes N1. Task 3 starts when N1 provides th
 
 **Files:** Portfolio `site/src/lib/notes-snapshot.ts`, `site/scripts/import-notes.ts`, `site/tests/notes-snapshot.test.ts`.
 
-**Consumes:** Notes N1 snapshot. **Produces:** `readNotesSnapshot(dir: string, expectedSha: string): Promise<NotesSnapshot>` and `npm run import:notes -- --from <staging-dir> --revision <sha>`. The output is a build-only generated folder. Copy only allowlisted Pages assets to the static site. Validate Worker packages against their separate inventory. A preview fixture must fail the release build even when its routes and digests are otherwise valid.
+**Consumes:** Notes N1 snapshot. **Produces:** `readNotesSnapshot(dir: string, expectedSha: string): Promise<NotesSnapshot>` and `npm run import:notes -- --from <staging-dir> --revision <sha> --receipt <path>`. The output is a build-only generated folder. Copy only allowlisted Pages assets to the static site. Validate Worker packages against their separate inventory. A preview fixture must fail the release build even when its routes and digests are otherwise valid.
 
-- [ ] Test exact schema version and SHA, integrity and size, duplicate IDs/routes, paths outside the export root, symlinks, unlisted files and an interrupted import. Assert the importer rejects each invalid input without replacing the last verified snapshot. Run `npx vitest run tests/notes-snapshot.test.ts` before implementation.
-- [ ] Implement validation and stage-to-final promotion. Require the exact digest of the exporter manifest from the upstream handoff, verify all listed bytes and reject mismatched curriculum generations. Keep a small synthetic snapshot fixture plus proof against the full reviewed Notes export. Never serve the raw checkout or the private manifest.
-- [ ] Verify the targeted suite and import the real snapshot with the expected full SHA. Commit the importer and fixtures.
+- [x] Test exact schema version and SHA, integrity and size, duplicate IDs/routes, paths outside the export root, symlinks, unlisted files and an interrupted import. Assert the importer rejects each invalid input without replacing the last verified snapshot. Run `npx vitest run tests/notes-snapshot.test.ts` before implementation.
+- [x] Implement validation and stage-to-final promotion. Require the exact digest of the exporter manifest from the upstream handoff, verify all listed bytes and reject mismatched curriculum generations. Keep a small synthetic snapshot fixture plus proof against the full reviewed Notes export. Never serve the raw checkout or the private manifest.
+- [x] Verify the targeted suite and import the real snapshot with the expected full SHA. Commit the importer and fixtures.
 
 ### Task 4. Integrate Notes, Interview and search
 
