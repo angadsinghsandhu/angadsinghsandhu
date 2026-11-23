@@ -46,9 +46,9 @@ The [master plan](2026-11-23-portfolio-notes-master.md) controls execution order
 
 ### Task 0. Record baselines and isolate the work
 
-- [ ] Create separate feature checkouts with git-worktree guidance. Record the portfolio README object ID, legacy index anchors and asset/link disposition in `docs/portfolio-migration.md`. Keep the old site recoverable in Git history.
-- [ ] Inspect the latest Notes integration PR bases before choosing a Notes feature base. Use the reviewed SHA for compatibility and do not assume the draft LeetCode stack must merge. Run `shasum -a 256 -c` against the handoff file `.superpowers/sdd/2026-10-24-leetcode-learning-platform/PARKED_NOTES_FILES.sha256` from the parked checkout before and after the work.
-- [ ] On a clean Notes copy, run `cd site && npm ci && npm run verify` with Node 24.18.1, Python 3.12.14, both pinned Python requirements files from Notes CI, full Chromium, a configured HTTPS `SITE_URL` and the actual `SOURCE_REVISION`. Serialize checks using the Notes browser port. Capture the committed revision, eligible route/alias/anchor inventory, archive parity result and file count/largest asset. Log expected differences if an independently reviewed base is selected later. Commit the inventory to the portfolio feature branch.
+- [x] Create separate feature checkouts with git-worktree guidance. Record the portfolio README object ID, legacy index anchors and asset/link disposition in `docs/portfolio-migration.md`. Keep the old site recoverable in Git history.
+- [x] Inspect the latest Notes integration PR bases before choosing a Notes feature base. Use the reviewed SHA for compatibility and do not assume the draft LeetCode stack must merge. Run `shasum -a 256 -c` against the handoff file `.superpowers/sdd/2026-10-24-leetcode-learning-platform/PARKED_NOTES_FILES.sha256` from the parked checkout before and after the work.
+- [x] On a clean Notes copy, run `cd site && npm ci && npm run verify` with Node 24.18.1, Python 3.12.14, both pinned Python requirements files from Notes CI, full Chromium, a configured HTTPS `SITE_URL` and the actual `SOURCE_REVISION`. Serialize checks using the Notes browser port. Capture the committed revision, eligible route/alias/anchor inventory, archive parity result and file count/largest asset. Log expected differences if an independently reviewed base is selected later. Commit the inventory to the portfolio feature branch.
 
 ### Task 1. Build the portfolio shell and editorial routes
 

@@ -34,4 +34,6 @@ Use `fc304f38e9757064537c094a4fb71c6447946920` for engineering compatibility in 
 
 Rebuild with Node 24.18.1, Python 3.12.14, pinned requirements, full Chromium, an HTTPS `SITE_URL` and the full `SOURCE_REVISION`. The initial local `npm run build` completed on the exact checkout. It checked file limits, routes, assets, fragments, source actions and search. The original [Notes CI run](https://github.com/angadsinghsandhu/Notes/actions/runs/45095454315) passed on the reviewed PR, with 940 unit and 119 browser tests. Compare route and anchor sets from `site/.generated/current/manifest.json` against the combined Portfolio output. Phase 3 owns the comparison and requires explicit review of any differences.
 
+A clean local run of `npm run verify` exited 0 on the same revision. It passed 940 unit, 119 Chromium, 75 archive parity and 48 curriculum tests. The final output verification passed and the Notes checkout returned to a clean Git status. The baseline includes 187 oversized non-test text files, including one UTF-16LE archive TSV.
+
 [Oversized Notes files at the engineering baseline](notes-baseline-oversized.tsv) records exact paths, Git blob IDs and physical line counts. A test directory alone does not exempt an ordinary fixture or helper. The Notes line gate will distinguish byte-identical legacy text from added, moved or edited files.

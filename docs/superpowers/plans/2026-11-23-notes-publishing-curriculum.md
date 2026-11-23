@@ -39,8 +39,8 @@ Test a renamed source with stable IDs and redirects in N1/N2, a conflicting assi
 
 ### N0. Record the clean starting point
 
-- [ ] Inventory current integration PRs and choose a clean Notes feature base. Compare the reviewed library baseline with `fc304f38e9757064537c094a4fb71c6447946920`; record which committed prerequisites are inherited or separately ported.
-- [ ] Verify all nine parked checksums without modifying the checkout. Run Notes `npm run verify` from a clean feature checkout with the baseline toolchains (Node 24.18.1 and Python 3.12.14) and full Chromium. Confirm route/source parity against the documented 6,279 reader routes and 10,031 original source records. Explain each reviewed difference.
+- [x] Inventory current integration PRs and choose a clean Notes feature base. Compare the reviewed library baseline with `fc304f38e9757064537c094a4fb71c6447946920`; record which committed prerequisites are inherited or separately ported.
+- [x] Verify all nine parked checksums without modifying the checkout. Run Notes `npm run verify` from a clean feature checkout with the baseline toolchains (Node 24.18.1 and Python 3.12.14) and full Chromium. Confirm route/source parity against the documented 6,279 reader routes and 10,031 original source records. Explain each reviewed difference.
 
 ### N1. Export the approved archive
 
