@@ -5,7 +5,8 @@
     "dependencies": {
       "@fontsource-variable/geist": "5.3.0",
       "@fontsource/ibm-plex-mono": "5.3.0",
-      "astro": "7.4.13"
+      "astro": "7.4.13",
+      "zod": "4.6.5"
     },
     "devDependencies": {
       "@astrojs/check": "0.9.12",
@@ -13,7 +14,8 @@
       "@types/node": "24.19.2",
       "prettier": "3.10.1",
       "prettier-plugin-astro": "1.1.2",
-      "typescript": "6.0.3"
+      "typescript": "6.0.3",
+      "vitest": "5.0.3"
     },
     "engines": {
       "node": "24.18.1"

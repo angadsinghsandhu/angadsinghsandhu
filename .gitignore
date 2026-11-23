@@ -6,3 +6,4 @@
 /site/.install-*/
 /site/playwright-report/
 /site/test-results/
+/site/.generated/

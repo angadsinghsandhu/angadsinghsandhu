@@ -14,14 +14,17 @@
     "format:check": "prettier --ignore-path ../.gitignore --check . ../.github/workflows/portfolio.yml",
     "check:lines": "node scripts/check-lines.mjs",
     "check:types": "astro check",
-    "test:unit": "node --test 'tests/**/*.test.mjs'",
+    "test:unit": "node --test 'tests/**/*.test.mjs' && vitest run",
     "test:browser": "playwright test",
-    "verify": "npm run format:check && npm run check:lines && npm run check:types && npm run test:unit && npm run build && npm run test:browser"
+    "verify": "npm run format:check && npm run check:lines && npm run check:types && npm run test:unit && npm run build && npm run test:browser",
+    "build:release": "node scripts/import-notes-release.ts",
+    "import:notes": "node scripts/import-notes.ts"
   },
   "dependencies": {
     "@fontsource-variable/geist": "5.3.0",
     "@fontsource/ibm-plex-mono": "5.3.0",
-    "astro": "7.4.13"
+    "astro": "7.4.13",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.12",
@@ -29,6 +32,7 @@
     "@types/node": "24.19.2",
     "prettier": "3.10.1",
     "prettier-plugin-astro": "1.1.2",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "vitest": "5.0.3"
   }
 }

@@ -12,6 +12,9 @@ const write = (file, contents) => writeFileSync(file, contents);
 const longNodeTest =
   'import test from "node:test";\ntest("exercise", () => {});\n' +
   "\n".repeat(499);
+const longVitestTest =
+  'import { it } from "vitest";\nit("exercise", () => {});\n' +
+  "\n".repeat(499);
 const longBrowserTest =
   'import { test } from "@playwright/test";\ntest("exercise", () => {});\n' +
   "\n".repeat(499);
@@ -27,6 +30,7 @@ test("checks physical lines of addable text and reports every oversized file", (
   write(join(directory, "crlf.txt"), "x\r\n".repeat(499) + "x");
   write(join(directory, "integration.test.mjs"), longNodeTest);
   write(join(directory, "integration.spec.ts"), longBrowserTest);
+  write(join(directory, "integration.test.ts"), longVitestTest);
   write(
     join(directory, "binary.dat"),
     Buffer.concat([Buffer.from([0]), Buffer.from("\n".repeat(501))]),
@@ -40,6 +44,7 @@ test("checks physical lines of addable text and reports every oversized file", (
   write(join(directory, "fixture.test.ts"), "x\n".repeat(501));
   write(join(directory, "fixture.spec.js"), longBrowserTest);
   write(join(directory, "wrong-runner.spec.ts"), longNodeTest);
+  write(join(directory, "wrong-runner.test.ts"), longNodeTest);
   write(join(outsideTests, "outside.spec.ts"), longBrowserTest);
   write(
     join(directory, "le.txt"),
@@ -57,6 +62,7 @@ test("checks physical lines of addable text and reports every oversized file", (
     "fixture.test.ts",
     "fixture.spec.js",
     "wrong-runner.spec.ts",
+    "wrong-runner.test.ts",
     "le.txt",
     "be.txt",
   ]) {
@@ -71,6 +77,6 @@ test("checks physical lines of addable text and reports every oversized file", (
   );
   assert.doesNotMatch(
     invalid.stderr,
-    /integration\.(?:test\.mjs|spec\.ts)|binary\.dat/,
+    /integration\.(?:test\.mjs|test\.ts|spec\.ts)|binary\.dat/,
   );
 });

@@ -17,13 +17,15 @@ const paths = execFileSync(
 );
 
 function isTestModule(path, source) {
-  // Match the discovery scope of test:unit and playwright.config.ts.
+  // Match the discovery scope of test:unit, vitest.config.ts and playwright.config.ts.
   if (!path.startsWith("site/tests/")) return false;
   const runner = path.endsWith(".test.mjs")
     ? "node:test"
-    : path.endsWith(".spec.ts")
-      ? "@playwright/test"
-      : undefined;
+    : path.endsWith(".test.ts")
+      ? "vitest"
+      : path.endsWith(".spec.ts")
+        ? "@playwright/test"
+        : undefined;
   if (!runner) return false;
 
   const imports = source.matchAll(
