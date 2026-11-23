@@ -1,0 +1,10 @@
+---
+import ReaderLayout from "../../layouts/ReaderLayout.astro";
+import { readPreparedCatalog, type ReaderProps } from "../../lib/notes-catalog";
+export async function getStaticPaths() {
+  return (await readPreparedCatalog()).readerPaths("/notes/");
+}
+interface Props extends ReaderProps {}
+---
+
+<ReaderLayout {...Astro.props} />

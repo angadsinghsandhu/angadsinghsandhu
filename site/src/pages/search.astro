@@ -1,0 +1,26 @@
+---
+import LibraryLayout from "../layouts/LibraryLayout.astro";
+import Breadcrumbs from "../components/notes/Breadcrumbs.astro";
+import Search from "../components/notes/Search.astro";
+import { readPreparedCatalog } from "../lib/notes-catalog";
+const { available } = await readPreparedCatalog();
+---
+
+<LibraryLayout
+  title="Search"
+  description="Search learning material or all published files by phrase, topic, collection, section, and kind."
+>
+  <Breadcrumbs title="Search" />
+  <h1>Search</h1>
+  {available ? (
+    <>
+      <p>
+        Choose All files to include project code, supplemental references, and
+        outlines. PDF and slide results include their metadata.
+      </p>
+      <Search />
+    </>
+  ) : (
+    <p>Search becomes available when the Notes library is published.</p>
+  )}
+</LibraryLayout>

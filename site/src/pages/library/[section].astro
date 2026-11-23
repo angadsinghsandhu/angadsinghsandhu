@@ -1,0 +1,30 @@
+---
+import LibraryLayout from "../../layouts/LibraryLayout.astro";
+import Breadcrumbs from "../../components/notes/Breadcrumbs.astro";
+import FolderContents from "../../components/notes/FolderContents.astro";
+import { readPreparedCatalog } from "../../lib/notes-catalog";
+import type { Folder } from "../../lib/notes-folders";
+export async function getStaticPaths() {
+  return (await readPreparedCatalog()).folders.map((folder) => ({
+    params: { section: folder.section },
+    props: { folder },
+  }));
+}
+interface Props {
+  folder: Folder;
+}
+const { folder } = Astro.props;
+---
+
+<LibraryLayout
+  title={folder.label}
+  description={`Browse ${folder.label.toLowerCase()} learning notes and resources.`}
+  folder={folder}
+>
+  <Breadcrumbs folder={folder} />
+  <h1>{folder.label}</h1>
+  <p>
+    {folder.noteCount} learning notes · {folder.resourceCount} resources
+  </p>
+  <FolderContents folder={folder} />
+</LibraryLayout>

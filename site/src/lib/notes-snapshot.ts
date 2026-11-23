@@ -12,6 +12,7 @@ import {
 } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { z } from "zod";
+import { publicOutputKey } from "./notes-routes.ts";
 import {
   portfolioSnapshotV1,
   type PortfolioSnapshotV1,
@@ -34,6 +35,7 @@ type Asset = PortfolioSnapshotV1["assets"][number];
 type VerifiedAsset = Asset & { file: string };
 
 export type NotesSnapshot = {
+  receipt: Receipt;
   manifest: PortfolioSnapshotV1;
   pagesAssets: VerifiedAsset[];
   workerAssets: VerifiedAsset[];
@@ -142,11 +144,7 @@ async function readVerifiedAsset(asset: VerifiedAsset) {
   return bytes;
 }
 
-async function verifyArtifact(
-  root: string,
-  receipt: Receipt,
-  copyTo?: string,
-): Promise<NotesSnapshot> {
+async function readManifest(root: string, receipt: Receipt) {
   await requireDirectory(root);
   const manifestBytes = await readRegularFile(join(root, "manifest.json"));
   if (sha256(manifestBytes) !== receipt.manifestSha256)
@@ -162,6 +160,25 @@ async function verifyArtifact(
   if (manifest.mode !== receipt.mode)
     throw new Error("Notes manifest mode differs from the receipt");
 
+  return { manifest, manifestBytes };
+}
+
+export async function readPinnedNotesManifest(dir: string, input: string) {
+  const receipt = receiptSchema.parse(JSON.parse(input));
+  await requireDirectory(dir);
+  const { manifest } = await readManifest(
+    join(dir, receipt.manifestSha256),
+    receipt,
+  );
+  return manifest;
+}
+
+async function verifyArtifact(
+  root: string,
+  receipt: Receipt,
+  copyTo?: string,
+): Promise<NotesSnapshot> {
+  const { manifest, manifestBytes } = await readManifest(root, receipt);
   const publicRoutes = [
     ...manifest.entries.flatMap(({ route, aliases }) => [route, ...aliases]),
     ...manifest.curriculum.lessons.map(({ route }) => route),
@@ -170,10 +187,7 @@ async function verifyArtifact(
   ];
   const claims = new Set<string>();
   for (const route of publicRoutes) {
-    const key = decodeURIComponent(route)
-      .toLowerCase()
-      .replace(/\/+$/u, "")
-      .replace(/\/index\.html$/u, "");
+    const key = publicOutputKey(route);
     if (claims.has(key)) throw new Error(`Duplicate public route: ${route}`);
     claims.add(key);
   }
@@ -198,7 +212,7 @@ async function verifyArtifact(
     if (copyTo)
       await writeFile(join(copyTo, asset.exportPath), bytes, { flag: "wx" });
   }
-  return { manifest, pagesAssets, workerAssets };
+  return { receipt, manifest, pagesAssets, workerAssets };
 }
 
 export async function readNotesSnapshot(

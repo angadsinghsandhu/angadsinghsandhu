@@ -18,18 +18,24 @@ Run `npm run dev -- --mode fixtures` to see the synthetic project and music rele
 
 ## Notes snapshot
 
-Run the import from `site/` using the reviewed Notes export directory, its full Git revision and the matching exporter receipt obtained through the handoff.
+Import a reviewed Notes export directory with its full Git revision and exporter receipt. Set the HTTPS origin for the combined build. Use a nonproduction origin for local acceptance.
 
 ```sh
-npm run import:notes -- --from /path/to/export --revision <sha> --receipt /path/to/receipt.json
-npm run build:release
+npm run import:notes -- --from /path/to/export --revision "$NOTES_REVISION" --receipt /path/to/receipt.json
+PORTFOLIO_ORIGIN=https://portfolio-preview.example npm run build:release
+PORTFOLIO_NOTES_BROWSER=archive npx playwright test tests/notes-reader.spec.ts
 ```
 
-The receipt binds the export mode, source revision and manifest SHA-256. The importer verifies the exact file tree and both asset inventories before atomically switching `.generated/notes/current.json`. A failed or interrupted import leaves the previous verified generation available. Identical imports reuse the same generation.
+The importer verifies the receipt, revision, file tree and assets before switching `.generated/notes/current.json`. Combined builds pin that verified generation for both rendering and asset copying. A failed or interrupted import leaves the previous generation available.
 
-`npm run build` still builds the shell independently. The release command requires a verified production import and adds only its Pages allowlist to `dist/content-assets/`. Worker packages, the manifest and preview fixtures stay outside the output. The Notes reader routes are added in the next integration task.
+`npm run build` builds the shell independently. The release command requires a production export. Its `dist/` includes canonical reader pages, aliases, a Pagefind index, local PDF support and only the snapshot's approved Pages assets. The manifest and Worker packages stay in the private build workspace.
 
-`readNotesSnapshot(dir, expectedSha)` reads the active generation from `dir` and returns the verified manifest with separate Pages and Worker file lists. Use `.generated/notes` for `dir` from `site/`.
+For a preview export, build and serve a separate output directory.
+
+```sh
+PORTFOLIO_ORIGIN=https://portfolio-preview.example npm run build:notes-preview -- "$NOTES_REVISION"
+npm run preview -- --ignore-lock --outDir .generated/notes-preview --port 4391
+```
 
 The versioned schema and preview fixture are copied byte-for-byte from Notes revision `ed3a31f261f25f03ff9be0fe5f5d91d13e45c093`.
 

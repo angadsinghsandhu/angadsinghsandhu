@@ -1,0 +1,35 @@
+---
+import EditorialPage from "../../components/EditorialPage.astro";
+import EditorialList from "../../components/EditorialList.astro";
+import { readPreparedCatalog } from "../../lib/notes-catalog";
+
+const { organization, listEntries } = await readPreparedCatalog();
+const interview = listEntries({ section: "interview" });
+const interviewIds = new Set(interview.map(({ id }) => id));
+const paths = organization
+  .listNodes("path")
+  .flatMap((path) =>
+    path.type === "path" &&
+    path.steps.some((step) =>
+      step.entries.some(({ id }) => interviewIds.has(id)),
+    )
+      ? [{ title: path.title, href: path.route, summary: path.summary }]
+      : [],
+  );
+const collection = organization.getNode("collection", "interview");
+const fallback =
+  collection?.route ?? (interview.length ? "/library/interview/" : "/library/");
+---
+
+<EditorialPage title="Interview">
+  {paths.length ? (
+    <EditorialList entries={paths} />
+  ) : (
+    <>
+      <p>Curated interview paths are still being prepared.</p>
+      <a class="action action--secondary" href={fallback}>
+        {fallback === "/library/" ? "Browse Notes" : "Browse Interview notes"}
+      </a>
+    </>
+  )}
+</EditorialPage>

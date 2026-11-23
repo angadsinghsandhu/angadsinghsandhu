@@ -1,0 +1,71 @@
+---
+import "../styles/library.css";
+import "../styles/folders.css";
+import "../styles/reader.css";
+import SiteLayout from "./SiteLayout.astro";
+import Navigation from "../components/notes/Navigation.astro";
+import type { Folder } from "../lib/notes-folders";
+import type { ContentEntry } from "../lib/notes-types";
+import type { OrganizationTreeNode } from "../lib/notes-organization-pages";
+
+interface Props {
+  title: string;
+  description: string;
+  organizationNav?: {
+    title: string;
+    route: string;
+    nodes: OrganizationTreeNode[];
+    currentRoute?: string;
+  };
+  entry?: ContentEntry;
+  folder?: Folder;
+  navItems?: ContentEntry[];
+}
+const { title, description, navItems: items = [], ...navigation } = Astro.props;
+---
+
+<SiteLayout {title} {description} wide>
+  <div class="library-shell">
+    <div class="library-controls" data-pagefind-ignore>
+      <button
+        type="button"
+        data-drawer-open
+        hidden
+        aria-haspopup="dialog"
+        aria-controls="navigation-drawer"
+      >
+        Browse
+      </button>
+      <a class="action" href="/search/">
+        Search
+      </a>
+    </div>
+    <aside class="library-sidebar">
+      <Navigation {items} {...navigation} />
+    </aside>
+    <div class="library-content">
+      <details class="no-js-navigation" data-pagefind-ignore>
+        <summary>Browse</summary>
+        <Navigation {items} {...navigation} />
+      </details>
+      <slot />
+    </div>
+    <dialog
+      id="navigation-drawer"
+      aria-labelledby="drawer-title"
+      data-pagefind-ignore
+    >
+      <div class="drawer-heading">
+        <h2 id="drawer-title">Browse the library</h2>
+        <button type="button" data-drawer-close>
+          Close
+        </button>
+      </div>
+      <Navigation {items} {...navigation} />
+    </dialog>
+  </div>
+</SiteLayout>
+<script>
+  import { initNavigation } from "../client/navigation";
+  initNavigation(document);
+</script>

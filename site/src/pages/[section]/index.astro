@@ -8,10 +8,12 @@ import {
 } from "../../content/editorial";
 
 export function getStaticPaths() {
-  return Object.entries(indexes).map(([section, index]) => ({
-    params: { section },
-    props: { index },
-  }));
+  return Object.entries(indexes)
+    .filter(([section]) => section !== "interview" && section !== "library")
+    .map(([section, index]) => ({
+      params: { section },
+      props: { index },
+    }));
 }
 
 interface Props {

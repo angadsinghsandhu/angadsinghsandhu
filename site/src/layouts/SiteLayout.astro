@@ -9,9 +9,17 @@ import { profile } from "../content/editorial";
 interface Props {
   title?: string;
   description?: string;
+  wide?: boolean;
 }
 
-const { title, description = "Portfolio of Angad Sandhu." } = Astro.props;
+const {
+  title,
+  description = "Portfolio of Angad Sandhu.",
+  wide = false,
+} = Astro.props;
+const canonical = Astro.site
+  ? new URL(Astro.url.pathname, Astro.site).href
+  : undefined;
 ---
 
 <!doctype html>
@@ -21,13 +29,14 @@ const { title, description = "Portfolio of Angad Sandhu." } = Astro.props;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
     <meta name="theme-color" content="#0d0d0f" />
+    {canonical && <link rel="canonical" href={canonical} />}
     <title>{title ? `${title} · ${profile.name}` : profile.name}</title>
   </head>
   <body>
     <a class="skip-link" href="#main">
       Skip to content
     </a>
-    <header class="header">
+    <header class="header" data-pagefind-ignore>
       <div class="header-inner page-width">
         <a class="brand" href="/" aria-label={profile.name}>
           {profile.name}
@@ -36,10 +45,14 @@ const { title, description = "Portfolio of Angad Sandhu." } = Astro.props;
         <PortfolioNav />
       </div>
     </header>
-    <main class="main page-width" id="main" tabindex="-1">
+    <main
+      class:list={["main page-width", { "main--wide": wide }]}
+      id="main"
+      tabindex="-1"
+    >
       <slot />
     </main>
-    <footer id="contact">
+    <footer id="contact" data-pagefind-ignore>
       <div class="footer-inner page-width">
         <span class="label">Find me online</span>
         <ul aria-label="Public profiles">
@@ -106,6 +119,11 @@ const { title, description = "Portfolio of Angad Sandhu." } = Astro.props;
   .main {
     flex: 1;
     padding-block: clamp(28px, 5vw, 54px) clamp(48px, 8vw, 100px);
+  }
+
+  .main--wide {
+    --content-width: 1480px;
+    padding-block-start: 20px;
   }
 
   footer {

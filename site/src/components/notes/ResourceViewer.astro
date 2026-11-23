@@ -1,0 +1,75 @@
+---
+import { sourceLabel } from "../../lib/notes-paths";
+import type { ContentEntry } from "../../lib/notes-types";
+import PdfViewer from "./PdfViewer.astro";
+interface Props {
+  entry: ContentEntry;
+  assetBytes?: number;
+}
+const { entry, assetBytes } = Astro.props;
+const filename = sourceLabel(entry);
+const size =
+  assetBytes === undefined
+    ? undefined
+    : assetBytes >= 1_048_576
+      ? `${(assetBytes / 1_048_576).toFixed(1)} MiB`
+      : `${(assetBytes / 1024).toFixed(1)} KiB`;
+const local = entry.assetUrl?.startsWith("/content-assets/");
+const source = entry.assetUrl?.startsWith("https://")
+  ? entry.assetUrl
+  : entry.sourceUrl;
+---
+
+<section aria-label="Resource information" class="resource-information">
+  {(size || filename !== entry.title) && (
+    <dl class="resource-details">
+      {filename !== entry.title && (
+        <div>
+          <dt>Source name</dt>
+          <dd>{filename}</dd>
+        </div>
+      )}
+      {size && (
+        <div>
+          <dt>Size</dt>
+          <dd>{size}</dd>
+        </div>
+      )}
+    </dl>
+  )}
+  {local && entry.kind === "pdf" && (
+    <>
+      <div class="actions">
+        <a class="action" href={entry.assetUrl}>
+          Open PDF
+        </a>
+        <a class="action" href={entry.assetUrl} download>
+          Download PDF
+        </a>
+      </div>
+      <PdfViewer url={entry.assetUrl!} />
+    </>
+  )}
+  {local && entry.kind === "slides" && (
+    <>
+      <p>Download these slides to open them in a presentation application.</p>
+      <div class="actions">
+        <a class="action" href={entry.assetUrl} download>
+          Download slides
+        </a>
+      </div>
+    </>
+  )}
+  {!local && ["pdf", "slides"].includes(entry.kind) && (
+    <>
+      <p>Open this resource at its original source.</p>
+      {source && (
+        <div class="actions">
+          <a class="action" href={source}>
+            Open external source
+          </a>
+        </div>
+      )}
+    </>
+  )}
+</section>

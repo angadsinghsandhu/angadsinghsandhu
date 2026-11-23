@@ -1,0 +1,26 @@
+---
+import LibraryLayout from "../../../layouts/LibraryLayout.astro";
+import Breadcrumbs from "../../../components/notes/Breadcrumbs.astro";
+import OrganizationCards from "../../../components/notes/OrganizationCards.astro";
+import { readPreparedCatalog } from "../../../lib/notes-catalog";
+import { organizationCards } from "../../../lib/notes-organization-pages";
+const catalog = await readPreparedCatalog();
+---
+
+<LibraryLayout
+  title="Learning Paths"
+  description="Follow an ordered study sequence through the existing notes."
+>
+  <div data-pagefind-ignore>
+    <Breadcrumbs title="Learning Paths" />
+    <h1>Learning Paths</h1>
+    <p>Follow an ordered study sequence through the existing notes.</p>
+    <h2>Available paths</h2>
+    <OrganizationCards
+      cards={organizationCards(
+        catalog.organization,
+        catalog.organization.listNodes("path"),
+      )}
+    />
+  </div>
+</LibraryLayout>
