@@ -1,6 +1,6 @@
 # Angad Sandhu portfolio and Notes integration
 
-**Status:** Approved for implementation planning in discussion. Implementation starts after plan review. Merging, provisioning, enabling production automation, deployment and post-cutover cleanup require separate authorization.
+**Status:** Approved for implementation planning in discussion. Implementation starts after plan review. Merges, infrastructure provisioning, the initial production cutover and post-cutover cleanup require authorization. Cutover approval enables automatic delivery for subsequent eligible releases.
 
 **Execution:** Follow the [master sequence](../plans/2026-11-23-portfolio-notes-master.md), the [Portfolio plan](../plans/2026-11-23-portfolio-notes.md) and the [Notes plan](../plans/2026-11-23-notes-publishing-curriculum.md). The October LeetCode design and plans are superseded as execution instructions.
 
@@ -57,6 +57,12 @@ Run the check after formatting, locally and in required CI. Report the path and 
 | Private owner features | **Portfolio owns** the eventual Access-protected Worker, D1 schema, private dashboard, studied controls and export. **Notes owns** stable IDs referenced by progress. No public signup or progress storage. |
 
 A component is transferred with its tests, provenance, dependency requirements and verified behavior. Start with reviewed committed inputs. Compare the parked milestone and organization baseline for the initial import. Preserve any licensing or attribution needed for reused code. Keep the portfolio root profile README and replace legacy `site/` only on a portfolio feature branch after recording useful links and assets. Leave the parked Notes checkout intact. Any future Notes changes go on a separate branch and checkout created with authorization.
+
+## Automatic CI/CD
+
+GitHub Actions runs verification when a pull request opens, reopens or receives new commits in either repository. Require a successful check on the current revision before merge. Both gates enforce the 500-line limit after formatting. Notes verifies the source and export contract. Portfolio verifies the combined static build, browser behavior, route parity and artifact budgets.
+
+After the initial authorized cutover, a push to Portfolio’s protected `main` or a verified change on the protected Notes publication branch automatically starts a production build. Portfolio resolves both approved revisions, verifies the final artifact, deploys those exact bytes to Cloudflare, smoke-tests the live host and records the release receipt. Routine eligible releases require no manual dispatch or per-release approval. A failed check blocks upload. A failed post-upload smoke test invokes the rollback procedure approved at cutover.
 
 ## Publishing contract
 
