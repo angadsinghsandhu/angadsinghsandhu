@@ -1,0 +1,38 @@
+---
+interface Props {
+  entries: readonly { href: string; title: string; summary?: string }[];
+}
+
+const { entries } = Astro.props;
+---
+
+<ul>
+  {entries.map(({ href, title, summary }) => (
+    <li>
+      <a href={href}>{title}</a>
+      {summary && <p>{summary}</p>}
+    </li>
+  ))}
+</ul>
+
+<style>
+  ul {
+    width: min(100%, 66ch);
+    margin: 0;
+    padding: 0;
+    border-block-start: 1px solid var(--rule);
+    list-style: none;
+  }
+
+  li {
+    padding: 5px 0 12px;
+    border-block-end: 1px solid var(--rule);
+  }
+
+  a {
+    display: inline-flex;
+    min-height: var(--target);
+    align-items: center;
+    font-weight: 650;
+  }
+</style>

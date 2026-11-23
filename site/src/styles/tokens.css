@@ -1,0 +1,139 @@
+:root {
+  color-scheme: dark;
+  --obsidian: #0d0d0f;
+  --graphite: #161618;
+  --rule: #303034;
+  --ink: #f4f1ee;
+  --muted: #b6b0b4;
+  --brand: oklch(52.768% 0.21534 29.097);
+  --accent: color-mix(in oklab, var(--brand) 59%, #fff);
+  --active: #2c191b;
+  --font: "Geist Variable", Geist, system-ui, sans-serif;
+  --mono: "IBM Plex Mono", monospace;
+  --page-inset: clamp(18px, 5vw, 54px);
+  --content-width: 1200px;
+  --target: 44px;
+  --radius: 3px;
+  --control-motion: 150ms;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--obsidian);
+  color: var(--ink);
+  font: 400 1rem/1.55 var(--font);
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(2.4rem, 6.6vw, 4.25rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.072em;
+}
+
+h2 {
+  font-size: clamp(1.3rem, 3vw, 1.6rem);
+  line-height: 1.18;
+  letter-spacing: -0.04em;
+}
+
+p {
+  max-width: 65ch;
+  color: var(--muted);
+}
+
+a {
+  color: var(--accent);
+  text-underline-offset: 0.24em;
+}
+
+button,
+summary {
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.page-width {
+  width: min(100%, var(--content-width));
+  margin-inline: auto;
+  padding-inline: var(--page-inset);
+}
+
+.label {
+  color: var(--muted);
+  font: 500 0.69rem/1.5 var(--mono);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+}
+
+.action {
+  display: inline-flex;
+  min-height: var(--target);
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: var(--radius);
+  font-size: 0.94rem;
+  font-weight: 650;
+  transition:
+    background-color var(--control-motion) ease,
+    color var(--control-motion) ease;
+}
+
+.action--primary {
+  background: var(--brand);
+  color: white;
+  text-decoration: none;
+}
+
+.action--secondary {
+  background: transparent;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 0.26em;
+}
+
+@media (hover: hover) {
+  .action--primary:hover {
+    background: color-mix(in oklab, var(--brand) 93%, #fff);
+  }
+
+  .action--secondary:hover {
+    background: var(--graphite);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --control-motion: 0ms;
+  }
+}

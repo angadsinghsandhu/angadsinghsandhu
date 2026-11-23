@@ -1,0 +1,142 @@
+---
+import "@fontsource-variable/geist";
+import "@fontsource/ibm-plex-mono/latin-400.css";
+import "@fontsource/ibm-plex-mono/latin-500.css";
+import "../styles/tokens.css";
+import PortfolioNav from "../components/PortfolioNav.astro";
+import { profile } from "../content/editorial";
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const { title, description = "Portfolio of Angad Sandhu." } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#0d0d0f" />
+    <title>{title ? `${title} · ${profile.name}` : profile.name}</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">
+      Skip to content
+    </a>
+    <header class="header">
+      <div class="header-inner page-width">
+        <a class="brand" href="/" aria-label={profile.name}>
+          {profile.name}
+          <span aria-hidden="true">.</span>
+        </a>
+        <PortfolioNav />
+      </div>
+    </header>
+    <main class="main page-width" id="main" tabindex="-1">
+      <slot />
+    </main>
+    <footer id="contact">
+      <div class="footer-inner page-width">
+        <span class="label">Find me online</span>
+        <ul aria-label="Public profiles">
+          {profile.links.map(({ href, label }) => (
+            <li>
+              <a href={href}>{label}</a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </footer>
+  </body>
+</html>
+
+<style>
+  body {
+    display: flex;
+    min-height: 100svh;
+    flex-direction: column;
+  }
+
+  .skip-link {
+    position: absolute;
+    top: 0;
+    left: var(--page-inset);
+    z-index: 4;
+    padding: 10px 14px;
+    background: var(--graphite);
+    transform: translateY(-120%);
+  }
+
+  .skip-link:focus {
+    transform: none;
+  }
+
+  .header,
+  footer {
+    border-block-end: 1px solid var(--rule);
+  }
+
+  .header-inner {
+    display: flex;
+    min-height: 64px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+  }
+
+  .brand {
+    display: inline-flex;
+    min-height: var(--target);
+    align-items: center;
+    color: var(--ink);
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .brand span {
+    color: var(--accent);
+  }
+
+  .main {
+    flex: 1;
+    padding-block: clamp(28px, 5vw, 54px) clamp(48px, 8vw, 100px);
+  }
+
+  footer {
+    border-block-start: 1px solid var(--rule);
+    border-block-end: none;
+  }
+
+  .footer-inner {
+    display: flex;
+    min-height: 64px;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 24px;
+    padding-block: 8px;
+  }
+
+  footer ul {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 13px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  footer a {
+    display: inline-flex;
+    min-height: var(--target);
+    align-items: center;
+    color: var(--muted);
+    font: 400 0.75rem/1.5 var(--mono);
+  }
+</style>

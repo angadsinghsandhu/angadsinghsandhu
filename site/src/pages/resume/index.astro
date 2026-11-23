@@ -1,0 +1,30 @@
+---
+import EditorialPage from "../../components/EditorialPage.astro";
+import { profile, resumePdfPath } from "../../content/editorial";
+
+const { resume } = profile;
+---
+
+<EditorialPage title="Résumé" summary={resume?.summary}>
+  {resume ? (
+    <>
+      <div class="actions">
+        <a class="action action--primary" href={resumePdfPath} download>
+          Download PDF
+        </a>
+      </div>
+      {resume.sections.map(({ heading, items }) => (
+        <section>
+          <h2>{heading}</h2>
+          <ul>
+            {items.map((item) => (
+              <li>{item}</li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </>
+  ) : (
+    <p>The résumé is being prepared for publication.</p>
+  )}
+</EditorialPage>

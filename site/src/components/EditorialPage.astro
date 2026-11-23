@@ -1,0 +1,51 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+
+interface Props {
+  title: string;
+  summary?: string;
+  parent?: { title: string; href: string };
+}
+
+const { title, summary, parent } = Astro.props;
+---
+
+<SiteLayout title={title} description={summary}>
+  <article>
+    {parent && (
+      <a class="label parent" href={parent.href}>
+        {parent.title}
+      </a>
+    )}
+    <header>
+      <h1>{title}</h1>
+      {summary && <p>{summary}</p>}
+    </header>
+    <div class="content">
+      <slot />
+    </div>
+  </article>
+</SiteLayout>
+
+<style>
+  .parent {
+    display: inline-flex;
+    min-height: var(--target);
+    align-items: center;
+  }
+
+  header p {
+    margin-block-start: 16px;
+    font-size: 1.125rem;
+  }
+
+  .content {
+    display: grid;
+    gap: 18px;
+    margin-block-start: 24px;
+  }
+
+  .content:empty {
+    display: none;
+  }
+</style>

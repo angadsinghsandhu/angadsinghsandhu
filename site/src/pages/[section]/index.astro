@@ -1,0 +1,32 @@
+---
+import EditorialList from "../../components/EditorialList.astro";
+import EditorialPage from "../../components/EditorialPage.astro";
+import {
+  approved,
+  indexes,
+  type EditorialIndex,
+} from "../../content/editorial";
+
+export function getStaticPaths() {
+  return Object.entries(indexes).map(([section, index]) => ({
+    params: { section },
+    props: { index },
+  }));
+}
+
+interface Props {
+  index: EditorialIndex;
+}
+
+const { title, intro, empty, links } = Astro.props.index;
+const entries = approved(links).map(({ href, label }) => ({
+  href,
+  title: label,
+}));
+const description = intro ?? (entries.length === 0 ? empty : undefined);
+---
+
+<EditorialPage title={title}>
+  {description && <p>{description}</p>}
+  {entries.length > 0 && <EditorialList {entries} />}
+</EditorialPage>

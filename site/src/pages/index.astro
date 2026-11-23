@@ -1,0 +1,142 @@
+---
+import HomeSignal from "../components/HomeSignal.astro";
+import { profile } from "../content/editorial";
+import SiteLayout from "../layouts/SiteLayout.astro";
+
+const index = [
+  { title: "Notes", summary: "Browse the library", href: "/library/" },
+  { title: "Music", summary: "Releases and credits", href: "/music/" },
+  { title: "Blog", summary: "Writing and experiments", href: "/blog/" },
+];
+---
+
+<SiteLayout>
+  <section class="hero" id="hero" aria-labelledby="nameplate">
+    <div class="hero-copy" id="about">
+      <span class="label">Portfolio &amp; Notes</span>
+      <h1 id="nameplate">
+        Angad
+        <br />
+        Sandhu<span>.</span>
+      </h1>
+      <p>
+        {profile.intro ?? "Projects, technical interview notes, and music."}
+      </p>
+      <div class="actions">
+        <a class="action action--primary" href="/interview/">
+          Explore Interview
+        </a>
+        <a class="action action--secondary" href="/projects/" id="portfolio">
+          Selected work
+        </a>
+      </div>
+    </div>
+    <HomeSignal />
+  </section>
+  <nav aria-label="Explore the portfolio">
+    <ul class="index">
+      {index.map(({ title, summary, href }) => (
+        <li>
+          <a href={href}>
+            <strong>{title}</strong>
+            <small>{summary}</small>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </nav>
+  <a class="action action--secondary resume" id="resume" href="/resume/">
+    Résumé
+  </a>
+</SiteLayout>
+
+<style>
+  .hero {
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    min-height: clamp(350px, 44vw, 510px);
+    align-items: center;
+  }
+
+  .hero-copy {
+    width: fit-content;
+    max-width: 100%;
+    padding-block: 24px;
+  }
+
+  .label {
+    display: block;
+    margin-block-end: 12px;
+  }
+
+  h1 {
+    font-size: clamp(3.25rem, 9.4vw, 6rem);
+    line-height: 0.98;
+  }
+
+  h1 span {
+    color: var(--accent);
+  }
+
+  .hero p {
+    max-width: 30ch;
+    margin-block: 16px 20px;
+    font-size: clamp(1rem, 2vw, 1.1875rem);
+  }
+
+  .index {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: clamp(20px, 4vw, 38px) 0 0;
+    padding: 0;
+    border-block-start: 1px solid var(--rule);
+    list-style: none;
+  }
+
+  .index li {
+    border-block-end: 1px solid var(--rule);
+  }
+
+  .index a {
+    display: grid;
+    gap: 2px;
+    padding: 15px 12px;
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .index small {
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+
+  .resume {
+    margin: 12px 0 0 -14px;
+  }
+
+  @media (hover: hover) {
+    .index a:hover {
+      background: var(--graphite);
+      color: var(--accent);
+    }
+  }
+
+  @media (max-width: 620px) {
+    .hero {
+      min-height: 0;
+    }
+
+    .hero-copy {
+      padding-block: 0;
+    }
+
+    h1 {
+      font-size: clamp(3.2rem, 12vw, 4.5rem);
+    }
+
+    .index {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>
