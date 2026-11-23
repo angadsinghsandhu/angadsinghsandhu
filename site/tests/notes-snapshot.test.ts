@@ -350,6 +350,38 @@ const manifestFailures: Array<[string, RegExp, (manifest: Manifest) => void]> =
       },
     ],
     [
+      "a static directory index matching a canonical route",
+      /Duplicate public route/i,
+      (manifest) => {
+        manifest.entries[0]!.aliases.push(
+          "/NOTES/books/worked-example/%69ndex%2Ehtml",
+        );
+      },
+    ],
+    [
+      "an archive directory index claiming a lesson route",
+      /Duplicate public route/i,
+      (manifest) => {
+        manifest.entries[0]!.aliases.push("/practice/leetcode/1/index.html");
+      },
+    ],
+    [
+      "an archive alias claiming a Pages asset URL",
+      /Duplicate public route/i,
+      (manifest) => {
+        manifest.entries[0]!.aliases.push(manifest.assets[0]!.publicPath);
+      },
+    ],
+    [
+      "an archive alias claiming a Worker trace URL",
+      /Duplicate public route/i,
+      (manifest) => {
+        manifest.entries[0]!.aliases.push(
+          manifest.curriculum.traceAssets[0]!.publicPath,
+        );
+      },
+    ],
+    [
       "traversal via encoded alias",
       /safe percent escapes/i,
       (manifest) => {

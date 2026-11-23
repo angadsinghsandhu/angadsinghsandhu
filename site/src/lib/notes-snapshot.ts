@@ -162,16 +162,21 @@ async function verifyArtifact(
   if (manifest.mode !== receipt.mode)
     throw new Error("Notes manifest mode differs from the receipt");
 
-  const archiveRoutes = new Set(
-    manifest.entries.flatMap(({ route, aliases }) =>
-      [route, ...aliases].map((value) =>
-        decodeURIComponent(value).replace(/\/+$/u, "").toLowerCase(),
-      ),
-    ),
-  );
-  for (const { route } of manifest.curriculum.lessons)
-    if (archiveRoutes.has(route.slice(0, -1)))
-      throw new Error(`Duplicate public route: ${route}`);
+  const publicRoutes = [
+    ...manifest.entries.flatMap(({ route, aliases }) => [route, ...aliases]),
+    ...manifest.curriculum.lessons.map(({ route }) => route),
+    ...manifest.assets.map(({ publicPath }) => publicPath),
+    ...manifest.curriculum.traceAssets.map(({ publicPath }) => publicPath),
+  ];
+  const claims = new Set<string>();
+  for (const route of publicRoutes) {
+    const key = decodeURIComponent(route)
+      .toLowerCase()
+      .replace(/\/+$/u, "")
+      .replace(/\/index\.html$/u, "");
+    if (claims.has(key)) throw new Error(`Duplicate public route: ${route}`);
+    claims.add(key);
+  }
 
   const withFile = (asset: Asset): VerifiedAsset => ({
     ...asset,
