@@ -1,5 +1,7 @@
 import { statSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
+import { profile } from "../src/content/editorial";
 
 for (const width of [320, 1280]) {
   test(`primary navigation is usable at ${width}px`, async ({ page }) => {
@@ -144,8 +146,38 @@ test("production indexes and detail routes exclude fixture content", async ({
     expect((await request.get(`/${index}/${slug}/`)).status()).toBe(404);
   }
   expect((await request.get("/fixtures/audio/")).status()).toBe(404);
+});
+
+test("résumé publication follows the approved editorial state", async ({
+  page,
+  request,
+}) => {
   await page.goto("/resume/");
-  await expect(page.getByRole("link", { name: "Download PDF" })).toHaveCount(0);
+  const link = page.getByRole("link", { name: "Download PDF" });
+  if (!profile.resume) {
+    await expect(
+      page.getByText("The résumé is being prepared for publication.", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(link).toHaveCount(0);
+    return;
+  }
+
+  await expect(link).toHaveAttribute("href", "/resume.pdf");
+  const response = await request.get("/resume.pdf", { maxRedirects: 0 });
+  expect(response.status()).toBe(200);
+  expect(response.headers()["content-type"]).toMatch(
+    /^application\/pdf(?:;|$)/i,
+  );
+
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    link.click(),
+  ]);
+  expect(new URL(download.url()).pathname).toBe("/resume.pdf");
+  const pdf = await readFile(await download.path());
+  expect(pdf.subarray(0, 5).toString("ascii")).toBe("%PDF-");
 });
 
 test("drafts are excluded and a fixture project links to its details", async ({

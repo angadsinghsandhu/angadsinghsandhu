@@ -9,18 +9,24 @@ const scan = () =>
     encoding: "utf8",
   });
 const write = (file, contents) => writeFileSync(file, contents);
-const genuineTest =
-  'import test from "node:test";\ntest("exercise", () => {});\n';
+const longNodeTest =
+  'import test from "node:test";\ntest("exercise", () => {});\n' +
+  "\n".repeat(499);
+const longBrowserTest =
+  'import { test } from "@playwright/test";\ntest("exercise", () => {});\n' +
+  "\n".repeat(499);
 
 test("checks physical lines of addable text and reports every oversized file", (t) => {
   const directory = mkdtempSync("tests/line-cap-");
-  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const outsideTests = mkdtempSync("line-cap-");
+  t.after(() => {
+    rmSync(directory, { recursive: true, force: true });
+    rmSync(outsideTests, { recursive: true, force: true });
+  });
   write(join(directory, "lf.txt"), "x\n".repeat(500));
   write(join(directory, "crlf.txt"), "x\r\n".repeat(499) + "x");
-  write(
-    join(directory, "integration.test.mjs"),
-    genuineTest + "\n".repeat(501),
-  );
+  write(join(directory, "integration.test.mjs"), longNodeTest);
+  write(join(directory, "integration.spec.ts"), longBrowserTest);
   write(
     join(directory, "binary.dat"),
     Buffer.concat([Buffer.from([0]), Buffer.from("\n".repeat(501))]),
@@ -32,6 +38,9 @@ test("checks physical lines of addable text and reports every oversized file", (
   write(join(directory, "lf.txt"), "x\n".repeat(501));
   write(join(directory, "crlf.txt"), "x\r\n".repeat(500) + "x");
   write(join(directory, "fixture.test.ts"), "x\n".repeat(501));
+  write(join(directory, "fixture.spec.js"), longBrowserTest);
+  write(join(directory, "wrong-runner.spec.ts"), longNodeTest);
+  write(join(outsideTests, "outside.spec.ts"), longBrowserTest);
   write(
     join(directory, "le.txt"),
     Buffer.from("\uFEFF" + "x\r\n".repeat(501), "utf16le"),
@@ -46,6 +55,8 @@ test("checks physical lines of addable text and reports every oversized file", (
     "lf.txt",
     "crlf.txt",
     "fixture.test.ts",
+    "fixture.spec.js",
+    "wrong-runner.spec.ts",
     "le.txt",
     "be.txt",
   ]) {
@@ -54,5 +65,12 @@ test("checks physical lines of addable text and reports every oversized file", (
       invalid.stderr,
     );
   }
-  assert.doesNotMatch(invalid.stderr, /integration\.test\.mjs|binary\.dat/);
+  assert.ok(
+    invalid.stderr.includes(`site/${outsideTests}/outside.spec.ts: 501 lines`),
+    invalid.stderr,
+  );
+  assert.doesNotMatch(
+    invalid.stderr,
+    /integration\.(?:test\.mjs|spec\.ts)|binary\.dat/,
+  );
 });

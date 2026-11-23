@@ -17,11 +17,20 @@ const paths = execFileSync(
 );
 
 function isTestModule(path, source) {
+  // Match the discovery scope of test:unit and playwright.config.ts.
+  if (!path.startsWith("site/tests/")) return false;
+  const runner = path.endsWith(".test.mjs")
+    ? "node:test"
+    : path.endsWith(".spec.ts")
+      ? "@playwright/test"
+      : undefined;
+  if (!runner) return false;
+
+  const imports = source.matchAll(
+    /^[\t ]*import\b[^;]*?\bfrom\s+["']([^"']+)["']/gmu,
+  );
   return (
-    /\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(path) &&
-    /^[\t ]*import\b[^;]*?\bfrom\s+["'](?:node:test|@playwright\/test|vitest)["']/mu.test(
-      source,
-    ) &&
+    [...imports].some((match) => match[1] === runner) &&
     /\b(?:test|it|describe)(?:\.[a-z]+)?\s*\(/u.test(source)
   );
 }
@@ -40,11 +49,12 @@ for (const path of new Set(paths.split("\0").filter(Boolean))) {
   if (!existsSync(file) || !lstatSync(file).isFile()) continue;
 
   const source = decodeText(readFileSync(file));
-  if (!source || isTestModule(path, source)) continue;
+  if (!source) continue;
 
   const separators = source.match(/\r\n|[\r\n]/gu);
   const count = (separators?.length ?? 0) + (/[\r\n]$/u.test(source) ? 0 : 1);
-  if (count > limit) failures.push(`${path}: ${count} lines`);
+  if (count > limit && !isTestModule(path, source))
+    failures.push(`${path}: ${count} lines`);
 }
 
 if (failures.length) {
