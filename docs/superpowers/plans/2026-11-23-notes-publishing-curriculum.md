@@ -17,7 +17,7 @@
 - Every official ID in 1–2000 has an explicit record. Author original explanations and solutions. Link the official problem and cite evidence without copying proprietary statements or examples. Company associations require dated sources; omit unsupported assertions.
 - Every materially distinct approach gets annotated code, a correctness argument, time and space complexity, curated examples and its own execution-backed visualization data. Order from less efficient to more efficient when helpful and omit contrived variants.
 - Keep draft records and associated code, trace payloads and lesson pages out of production. Portfolio owns Astro routes, player UI, Pagefind, public navigation, and private progress.
-- No provisioning, merge, production deployment, notification secret activation or deletion without separate authorization.
+- Obtain authorization for provisioning, merge, initial production cutover, notification secret activation and cleanup. Once enabled, automatic CI/CD sends eligible updates to Portfolio.
 
 - Apply the **500-line maximum** in the design to every new, transferred or changed non-test text file. At N0 record the exact base inventory of existing oversized files. At N1 add a required line-count check to Notes verification. Untouched historical files stay identifiable by path and blob hash. A changed historical file must pass, and moving or copying an oversized file cannot grandfather it. Use the Portfolio Task 1 boundary cases; run the check from the first Notes change onward.
 
@@ -58,6 +58,7 @@ Test a renamed source with stable IDs and redirects in N1/N2, a conflicting assi
 ### N2. Verify authoring and notifications
 
 - [ ] Exercise create, edit, rename and removal from the Notes authoring workflow. Assert the next snapshot reflects each reviewed change, has no stale entries and excludes private/draft content. Preserve the existing Notes-only verification path through cutover.
+- [ ] Run required Notes verification on every PR open, reopen and update. Exercise the 500-line check, archive parity, curriculum checks and exporter contract. On push to the approved publication branch, reverify the exact landed SHA. Test that a successful source edit triggers one effective Portfolio release and that a failed run produces no dispatch.
 - [ ] Extend the trusted branch workflow only after confirming publication ref policy. Emit the exact verified full SHA and dispatch only after successful upstream CI once production automation is authorized. Test false cases for PR refs, failed runs and mismatched revisions. Keep secrets and production dispatch disabled for pull requests. Portfolio plan Task 6 owns receiving and deployment verification.
 
 ### N3. Reconcile official identities and pilot evidence
