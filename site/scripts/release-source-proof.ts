@@ -1,5 +1,9 @@
 import { z } from "zod";
-import type { EligibilityEvidence } from "./release-policy";
+import {
+  evaluateNotesRevision,
+  type EligibilityEvidence,
+  type NotesCandidate,
+} from "./release-policy";
 
 type Source = NonNullable<EligibilityEvidence["approval"]>;
 type ProtectedSource = Pick<Source, "repository" | "ref">;
@@ -53,6 +57,10 @@ const githubRun = z.object({
   head_branch: z.string(),
   event: z.string(),
 });
+const githubRuns = z.object({
+  total_count: z.number().int().nonnegative(),
+  workflow_runs: z.array(githubRun.extend({ run_number: id })).max(100),
+});
 const githubJob = z.object({
   ...githubCheck,
   name: z.string().min(1),
@@ -69,6 +77,23 @@ function matchesRepository(
   expected: Source["repository"],
 ): boolean {
   return actual.id === expected.id && actual.full_name === expected.name;
+}
+
+function matchesNotesRun(
+  run: z.infer<typeof githubRun>,
+  approval: Source,
+  commit: string,
+): boolean {
+  return (
+    run.workflow_id === approval.workflowId &&
+    matchesRepository(run.repository, approval.repository) &&
+    matchesRepository(run.head_repository, approval.repository) &&
+    branchPrefix + run.head_branch === approval.ref &&
+    run.head_sha === commit &&
+    run.event === "push" &&
+    run.status === "completed" &&
+    run.conclusion === "success"
+  );
 }
 
 async function readGitHub<T>(
@@ -151,14 +176,7 @@ export async function readNotesEvidence(
   if (
     !actual ||
     actual.id !== candidate.runId ||
-    actual.workflow_id !== approval.workflowId ||
-    !matchesRepository(actual.repository, approval.repository) ||
-    !matchesRepository(actual.head_repository, approval.repository) ||
-    branchPrefix + actual.head_branch !== approval.ref ||
-    actual.head_sha !== candidate.sha ||
-    actual.event !== "push" ||
-    actual.status !== "completed" ||
-    actual.conclusion !== "success"
+    !matchesNotesRun(actual, approval, candidate.sha)
   ) {
     return { approval, head };
   }
@@ -209,4 +227,65 @@ export async function readNotesEvidence(
       conclusion: job.conclusion,
     },
   };
+}
+
+export async function readCurrentNotesRevision(
+  approved: Source,
+  api: GitHubReader,
+): Promise<
+  { candidate: NotesCandidate; evidence: EligibilityEvidence } | undefined
+> {
+  const policy = approvalSchema.safeParse(approved);
+  if (!policy.success) return undefined;
+
+  const approval = policy.data;
+  const head = await readProtectedHead(approval, api);
+  if (!head) return undefined;
+
+  const query = new URLSearchParams({
+    branch: approval.ref.slice(branchPrefix.length),
+    event: "push",
+    head_sha: head.sha,
+    status: "success",
+    per_page: "100",
+  });
+  const path =
+    "/repos/" +
+    approval.repository.name +
+    "/actions/workflows/" +
+    approval.workflowId +
+    "/runs?" +
+    query.toString();
+  const result = await readGitHub(path, api, githubRuns);
+  if (!result || result.total_count !== result.workflow_runs.length)
+    return undefined;
+
+  const runs = result.workflow_runs;
+  if (
+    new Set(runs.map((run) => run.id)).size !== runs.length ||
+    new Set(runs.map((run) => run.run_number)).size !== runs.length ||
+    runs.some((run) => !matchesNotesRun(run, approval, head.sha))
+  ) {
+    return undefined;
+  }
+
+  const [latest] = runs.sort(
+    (left, right) => right.run_number - left.run_number,
+  );
+  if (!latest) return undefined;
+
+  const candidate = {
+    repository: approval.repository.name,
+    ref: approval.ref,
+    sha: head.sha,
+    runId: latest.id,
+  };
+  const evidence = await readNotesEvidence(candidate, approval, api);
+  if (
+    evidence.run?.attempt !== latest.run_attempt ||
+    evaluateNotesRevision(candidate, evidence).decision !== "eligible"
+  ) {
+    return undefined;
+  }
+  return { candidate, evidence };
 }

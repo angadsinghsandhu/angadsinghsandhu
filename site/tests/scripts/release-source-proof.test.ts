@@ -1,6 +1,7 @@
 import { expect, it, vi } from "vitest";
 import { evaluateNotesRevision } from "../../scripts/release-policy";
 import {
+  readCurrentNotesRevision,
   readNotesEvidence,
   readProtectedHead,
 } from "../../scripts/release-source-proof";
@@ -187,3 +188,115 @@ it("matches the exact configured job name", async () => {
   const evidence = await readNotesEvidence(candidate, exactApproval, api);
   expect(evaluateNotesRevision(candidate, evidence).decision).toBe("deny");
 });
+
+const listedRun = { ...githubRun, run_number: 80 };
+const earlierRun = { ...listedRun, id: 42, run_number: 79 };
+const runList = { total_count: 2, workflow_runs: [earlierRun, listedRun] };
+const jobList = { total_count: 1, jobs: [githubJob] };
+
+it("discovers the newest successful Notes run for the protected head", async () => {
+  const api = fakeGitHub(
+    githubRepository,
+    githubBranch,
+    runList,
+    githubRepository,
+    githubBranch,
+    githubRun,
+    jobList,
+  );
+  const result = await readCurrentNotesRevision(approval, api);
+  expect(result?.candidate).toEqual(candidate);
+  expect(result?.evidence.job).toMatchObject({ runAttempt: 2, sha });
+  expect(api.http.mock.calls.map(([url]) => url)).toEqual([
+    "https://api.github.com/repos/example/notes",
+    "https://api.github.com/repos/example/notes/branches/release%2Fnotes",
+    "https://api.github.com/repos/example/notes/actions/workflows/379127533/runs?branch=release%2Fnotes&event=push&head_sha=" +
+      sha +
+      "&status=success&per_page=100",
+    "https://api.github.com/repos/example/notes",
+    "https://api.github.com/repos/example/notes/branches/release%2Fnotes",
+    "https://api.github.com/repos/example/notes/actions/runs/45294310968",
+    "https://api.github.com/repos/example/notes/actions/runs/45294310968/attempts/2/jobs?per_page=100",
+  ]);
+});
+
+it("rejects an invalid approval before discovery", async () => {
+  const api = fakeGitHub();
+  expect(
+    await readCurrentNotesRevision({ ...approval, workflowId: -1 }, api),
+  ).toBeUndefined();
+  expect(api.http).not.toHaveBeenCalled();
+});
+
+it.each([
+  new Response("missing", { status: 404 }),
+  { ...githubBranch, protected: false },
+])("requires a protected head before discovery", async (head) => {
+  const api = fakeGitHub(githubRepository, head);
+  expect(await readCurrentNotesRevision(approval, api)).toBeUndefined();
+  expect(api.http).toHaveBeenCalledTimes(2);
+});
+
+it.each([
+  { total_count: 0, workflow_runs: [] },
+  { ...runList, total_count: 3 },
+  { ...runList, workflow_runs: [earlierRun, githubRun] },
+  { ...runList, workflow_runs: [earlierRun, { ...listedRun, run_number: 79 }] },
+  { ...runList, workflow_runs: [earlierRun, { ...listedRun, id: 42 }] },
+  {
+    ...runList,
+    workflow_runs: [earlierRun, { ...listedRun, head_sha: "b".repeat(40) }],
+  },
+  {
+    ...runList,
+    workflow_runs: [earlierRun, { ...listedRun, conclusion: "failure" }],
+  },
+  Response.json(runList, {
+    headers: { link: '<https://api.github.com/next>; rel="next"' },
+  }),
+])(
+  "rejects absent, incomplete, ambiguous or mismatched run listings",
+  async (runs) => {
+    const api = fakeGitHub(githubRepository, githubBranch, runs);
+    expect(await readCurrentNotesRevision(approval, api)).toBeUndefined();
+    expect(api.http).toHaveBeenCalledTimes(3);
+  },
+);
+
+it("rejects a Notes head that moves after discovering a run", async () => {
+  const api = fakeGitHub(
+    githubRepository,
+    githubBranch,
+    runList,
+    githubRepository,
+    {
+      ...githubBranch,
+      commit: { sha: "b".repeat(40) },
+    },
+  );
+  expect(await readCurrentNotesRevision(approval, api)).toBeUndefined();
+  expect(api.http).toHaveBeenCalledTimes(5);
+});
+
+it.each([
+  [githubRun, { total_count: 1, jobs: [{ ...githubJob, run_attempt: 1 }] }],
+  [
+    { ...githubRun, run_attempt: 3 },
+    { total_count: 1, jobs: [{ ...githubJob, run_attempt: 3 }] },
+  ],
+])(
+  "rejects a changed run attempt or mismatched exact job without falling back",
+  async (run, jobs) => {
+    const api = fakeGitHub(
+      githubRepository,
+      githubBranch,
+      runList,
+      githubRepository,
+      githubBranch,
+      run,
+      jobs,
+    );
+    expect(await readCurrentNotesRevision(approval, api)).toBeUndefined();
+    expect(api.http).toHaveBeenCalledTimes(7);
+  },
+);
