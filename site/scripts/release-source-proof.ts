@@ -13,7 +13,7 @@ const branchRef = z.string().refine((ref) => {
   if (!ref.startsWith(branchPrefix)) return false;
   const branch = ref.slice(branchPrefix.length);
   return (
-    !/[\s\p{Cc}\p{Cs}~^:?*\[\\]|\.\.|@\{/u.test(branch) &&
+    !/[\s\p{Cc}\p{Cs}~^:?*[\\]|\.\.|@\{/u.test(branch) &&
     !branch.endsWith(".") &&
     branch
       .split("/")

@@ -114,6 +114,7 @@ it.each([
 
 it.each([
   { ...source, ref: "refs/heads/.." },
+  { ...source, ref: "refs/heads/invalid[branch" },
   { ...source, ref: "refs/heads/\ud800" },
   { ...source, repository: { ...repository, name: "../notes" } },
 ])("denies unsafe approved paths before HTTP (%j)", async (invalidSource) => {
