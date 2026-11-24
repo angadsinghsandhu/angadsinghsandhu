@@ -1,5 +1,14 @@
-import { lstatSync, readdirSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { createHash } from "node:crypto";
+import {
+  lstatSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import {
   approved,
   indexes,
@@ -11,6 +20,7 @@ import {
 import { notesLicenseFiles } from "../src/lib/notes-license-files.ts";
 import { claimNotesRoutes } from "../src/lib/notes-routes.ts";
 import type { NotesSnapshot } from "../src/lib/notes-snapshot.ts";
+import { z } from "zod";
 import { renderNotesRedirects, renderSitemap } from "./notes-redirects.ts";
 
 const maximumFiles = 20_000;
@@ -88,8 +98,6 @@ export function releaseInventory(snapshot: NotesSnapshot, origin: string) {
       "/_redirects",
     ]),
   );
-  if (snapshot.manifest.verifiedCurriculumIds.length)
-    throw new Error("The Pages build does not yet render verified curriculum");
 
   const canonical = new Map(
     [...shell, ...pages.keys()].map((route) => [
@@ -126,4 +134,76 @@ export function reportOutput(files: ReadonlyMap<string, number>) {
     .sort((left, right) => right[1] - left[1])
     .slice(0, 5);
   console.log(JSON.stringify({ files: files.size, bytes, largest }, null, 2));
+}
+
+const searchInventoryPath = ".generated/pages-search-inventory.json";
+const pagefindBundle =
+  /^\/pagefind\/(?:pagefind(?:-entry\.json|-worker\.js|\.js|\.[\w-]+\.pf_meta)|wasm\.[\w-]+\.pagefind|(?:fragment\/[\w-]+\.pf_fragment|index\/[\w-]+\.pf_index|filter\/[\w-]+\.pf_filter))$/u;
+const searchInventory = z.strictObject({
+  mode: z.literal("production"),
+  sourceSha: z.string(),
+  manifestSha256: z.string(),
+  origin: z.string(),
+  files: z.record(
+    z.string().regex(pagefindBundle),
+    z.string().regex(/^[a-f0-9]{64}$/u),
+  ),
+});
+
+const isPagefind = (path: string) => path.startsWith("/pagefind/");
+const fileDigest = (directory: string, path: string) =>
+  createHash("sha256")
+    .update(readFileSync(join(directory, path)))
+    .digest("hex");
+
+export function writeSearchInventory(
+  directory: string,
+  receipt: NotesSnapshot["receipt"],
+  origin: string,
+) {
+  const files = Object.fromEntries(
+    [...readOutput(directory).keys()]
+      .filter(isPagefind)
+      .map((path) => [path, fileDigest(directory, path)]),
+  );
+  const value = searchInventory.parse({ ...receipt, origin, files });
+  const stage = mkdtempSync(
+    join(dirname(searchInventoryPath), ".search-inventory-"),
+  );
+  try {
+    const staged = join(stage, "receipt.json");
+    writeFileSync(staged, JSON.stringify(value) + "\n", { flag: "wx" });
+    renameSync(staged, searchInventoryPath);
+  } finally {
+    rmSync(stage, { recursive: true, force: true });
+  }
+}
+
+export function verifySearchInventory(
+  directory: string,
+  files: ReadonlyMap<string, number>,
+  receipt: NotesSnapshot["receipt"],
+  origin: string,
+) {
+  const inventory = searchInventory.parse(
+    JSON.parse(readFileSync(searchInventoryPath, "utf8")),
+  );
+  if (
+    inventory.mode !== receipt.mode ||
+    inventory.sourceSha !== receipt.sourceSha ||
+    inventory.manifestSha256 !== receipt.manifestSha256 ||
+    inventory.origin !== origin
+  )
+    throw new Error(
+      "Pagefind inventory does not match the staged snapshot and origin",
+    );
+  for (const [path, digest] of Object.entries(inventory.files)) {
+    if (!files.has(path)) throw new Error(`Missing Pagefind file: ${path}`);
+    if (fileDigest(directory, path) !== digest)
+      throw new Error(`Pagefind file digest differs: ${path}`);
+  }
+  for (const path of files.keys())
+    if (isPagefind(path) && !Object.hasOwn(inventory.files, path))
+      throw new Error(`Unlisted Pagefind file: ${path}`);
+  return new Set(Object.keys(inventory.files));
 }

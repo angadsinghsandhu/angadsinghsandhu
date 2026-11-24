@@ -593,14 +593,25 @@ async function runRelease(root: string) {
     join(root, "package.json"),
     await readFile(join(project, "package.json")),
   );
-  await mkdir(join(root, "src/pages"), { recursive: true });
+  await mkdir(join(root, "src/pages/notes/books"), { recursive: true });
+  await mkdir(join(root, "public"));
+  await symlink(join(project, "src/lib"), join(root, "src/lib"));
+  await writeFile(
+    join(root, "astro.config.mjs"),
+    await readFile(join(project, "astro.config.mjs")),
+  );
   await writeFile(
     join(root, "src/pages/index.astro"),
-    "<h1>Portfolio fixture</h1>",
+    '<html lang="en"><body><h1>Portfolio fixture</h1></body></html>',
+  );
+  await writeFile(
+    join(root, "src/pages/notes/books/worked-example.astro"),
+    '<html lang="en"><body><article data-pagefind-body>Published worked example.</article></body></html>',
   );
   return spawnSync("npm", ["run", "build:release"], {
     cwd: root,
     encoding: "utf8",
+    env: { ...process.env, PORTFOLIO_ORIGIN: "https://portfolio.example" },
   });
 }
 
@@ -641,7 +652,29 @@ it("publishes only Pages inventory from a verified production snapshot", async (
   expect(result.stderr).toBe("");
   expect(result.status).toBe(0);
   const output = join(paths.root, "dist");
-  expect(await readdir(output)).toEqual(["content-assets", "index.html"]);
+  expect(await readdir(output)).toEqual([
+    "_redirects",
+    "content-assets",
+    "index.html",
+    "licenses",
+    "notes",
+    "pagefind",
+    "sitemap.xml",
+  ]);
+  const inventory = JSON.parse(
+    await readFile(
+      join(paths.root, ".generated/pages-search-inventory.json"),
+      "utf8",
+    ),
+  );
+  expect(inventory).toMatchObject({
+    mode: "production",
+    sourceSha: manifest.sourceSha,
+    origin: "https://portfolio.example",
+    files: {
+      "/pagefind/pagefind.js": expect.stringMatching(/^[a-f0-9]{64}$/u),
+    },
+  });
   expect(await readdir(join(output, "content-assets"))).toEqual([
     `${pagesHash}.pdf`,
   ]);

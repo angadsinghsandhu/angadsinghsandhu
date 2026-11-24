@@ -8,6 +8,7 @@ import {
   readOutput,
   releaseInventory,
   reportOutput,
+  verifySearchInventory,
 } from "./output-inventory.ts";
 import { physicalLines } from "./output-text.ts";
 import { pdfAssets } from "./pdf-assets.ts";
@@ -16,8 +17,6 @@ import {
   readProductionNotesSnapshot,
 } from "../src/lib/notes-snapshot.ts";
 
-const pagefindBundle =
-  /^\/pagefind\/(?:pagefind(?:-entry\.json|-worker\.js|\.js|\.[\w-]+\.pf_meta)|wasm\.[\w-]+\.pagefind|(?:fragment\/[\w-]+\.pf_fragment|index\/[\w-]+\.pf_index|filter\/[\w-]+\.pf_filter))$/u;
 const astroBundle =
   /^\/_astro\/[\w.-]+\.[\w-]{8}\.(?:css|js|woff2?|ttf|eot|gif|png|jpe?g|svg|webp|avif)$/u;
 
@@ -29,25 +28,56 @@ function documentInfo(html: string, route: string, origin: string) {
   const canonicals: string[] = [];
   const ids = new Set<string>();
   const links = new Set<string>();
+  const pdfViewers = new Set<string>();
+  const pdfDownloads = new Set<string>();
+  const pdfOpenLinks = new Set<string>();
   const base = new URL(route, origin);
   const stack = [...fromHtml(html).children];
   while (stack.length) {
     const node = stack.pop()!;
     if (node.type !== "element") continue;
     stack.push(...node.children);
-    const { id, name, href, rel, src, srcSet, poster, dataPdfUrl, data } =
+    const { id, name, href, rel, src, srcSet, poster, dataPdfUrl, data, as } =
       node.properties;
     if (typeof id === "string") ids.add(id);
     if (node.tagName === "a" && typeof name === "string") ids.add(name);
     if (node.tagName === "base")
       throw new Error(`Unexpected base URL on ${route}`);
-    if (
-      node.tagName === "link" &&
-      Array.isArray(rel) &&
-      rel.includes("canonical")
-    ) {
+    const relationships =
+      node.tagName === "link" && Array.isArray(rel)
+        ? rel.map((token) => String(token).toLowerCase())
+        : [];
+    if (relationships.includes("canonical")) {
       canonicals.push(String(href));
       continue;
+    }
+    const runtimeLink =
+      relationships.includes("stylesheet") ||
+      relationships.includes("modulepreload") ||
+      (relationships.includes("preload") &&
+        ["script", "style", "font", "worker"].includes(String(as)));
+    for (const value of [
+      node.tagName === "script" ? src : undefined,
+      runtimeLink ? href : undefined,
+      dataPdfUrl,
+    ]) {
+      if (typeof value !== "string" || !value.trim()) continue;
+      const url = URL.parse(value, base);
+      if (url?.origin !== origin || url.protocol !== "https:")
+        throw new Error(`Cross-origin runtime asset: ${route} → ${value}`);
+      if (value === dataPdfUrl) pdfViewers.add(url.href);
+    }
+    if (node.tagName === "a" && typeof href === "string") {
+      const url = URL.parse(href, base);
+      if (
+        url?.origin === origin &&
+        url.pathname.startsWith("/content-assets/")
+      ) {
+        const action = Object.hasOwn(node.properties, "download")
+          ? pdfDownloads
+          : pdfOpenLinks;
+        action.add(url.href);
+      }
     }
     const candidates = [
       href,
@@ -67,7 +97,7 @@ function documentInfo(html: string, route: string, origin: string) {
       if (url.origin === origin) links.add(url.pathname + url.hash);
     }
   }
-  return { canonicals, ids, links };
+  return { canonicals, ids, links, pdfViewers, pdfDownloads, pdfOpenLinks };
 }
 
 function summarize(paths: string[]) {
@@ -181,6 +211,8 @@ async function certify(directory: string) {
   const snapshot = await readProductionNotesSnapshot(
     resolve(notesSnapshotDirectory),
   );
+  if (snapshot.manifest.verifiedCurriculumIds.length)
+    throw new Error("The Pages build does not yet render verified curriculum");
   const expected = releaseInventory(snapshot, parsedOrigin);
   const missing = [...expected.canonical.keys()].filter(
     (path) => !pages.has(path),
@@ -198,6 +230,12 @@ async function certify(directory: string) {
     }),
   );
   checkLinks(files, pages, parsedOrigin, expected.aliases);
+  const searchFiles = verifySearchInventory(
+    directory,
+    files,
+    snapshot.receipt,
+    parsedOrigin,
+  );
   if (missing.length || unexpected.length)
     throw new Error(
       summarize([
@@ -214,7 +252,24 @@ async function certify(directory: string) {
   }
   let anchors = 0;
   for (const entry of snapshot.manifest.entries) {
-    const { ids } = pages.get(pagePath(entry.route))!;
+    const { ids, pdfViewers, pdfDownloads, pdfOpenLinks } = pages.get(
+      pagePath(entry.route),
+    )!;
+    if (
+      entry.kind === "pdf" &&
+      entry.assetUrl?.startsWith("/content-assets/")
+    ) {
+      const asset = new URL(entry.assetUrl, parsedOrigin).href;
+      if (
+        pdfViewers.size !== 1 ||
+        !pdfViewers.has(asset) ||
+        !pdfDownloads.has(asset) ||
+        !pdfOpenLinks.has(asset)
+      )
+        throw new Error(
+          `Local PDF actions differ from the staged snapshot: ${entry.route}`,
+        );
+    }
     const fragments = new Set([
       ...entry.anchors,
       ...entry.headings.map(({ id }) => id),
@@ -240,12 +295,14 @@ async function certify(directory: string) {
   for (const path of required)
     if (!files.has(path)) throw new Error(`Missing public file: ${path}`);
   const indexed = new Set(snapshot.manifest.entries.map(({ route }) => route));
+  if (!indexed.size && searchFiles.size)
+    throw new Error("Pagefind assets are present with no indexed entries");
   for (const path of files.keys()) {
     const source = expected.publicAssets.get(path);
     if (
       !required.has(path) &&
       !astroBundle.test(path) &&
-      !(indexed.size && pagefindBundle.test(path))
+      !searchFiles.has(path)
     )
       throw new Error(`Unexpected public file: ${path}`);
     const bytes = readFileSync(join(directory, path));
@@ -263,10 +320,12 @@ async function certify(directory: string) {
         .toString("utf8")
         .matchAll(/url\(\s*["']?([^"'\s)]+)/gu)) {
         const url = new URL(match[1]!, new URL(path, parsedOrigin));
-        if (
-          url.origin === parsedOrigin &&
-          !files.has(decodeURIComponent(url.pathname))
-        )
+        if (url.protocol === "data:") continue;
+        if (url.origin !== parsedOrigin)
+          throw new Error(
+            `Cross-origin stylesheet asset: ${path} → ${url.href}`,
+          );
+        if (!files.has(decodeURIComponent(url.pathname)))
           throw new Error(
             `Missing stylesheet asset: ${path} → ${url.pathname}`,
           );

@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { outputOrigin } from "./notes-redirects.ts";
-import { releaseInventory } from "./output-inventory.ts";
+import { releaseInventory, writeSearchInventory } from "./output-inventory.ts";
 import {
   copyNotesPagesAssets,
   notesSnapshotDirectory,
@@ -39,6 +39,7 @@ try {
   await copyNotesPagesAssets(snapshot, resolve(output));
   for (const [filename, content] of metadata)
     await writeFile(join(output, filename), content, { flag: "wx" });
+  if (!preview) writeSearchInventory(resolve(output), snapshot.receipt, origin);
 } catch (error) {
   console.error(String(error));
   process.exitCode = 1;

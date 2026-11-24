@@ -134,24 +134,20 @@ test("isolated preview rebuild adds, edits, renames, and removes reader output",
             return [source, { target, status }] as const;
           }),
       );
-      const http = createServer(async (incoming, outgoing) => {
-        const url = new URL(incoming.url ?? "/", address);
-        const rule = redirects.get(url.pathname);
+      const canonicalHtml = await readFile(html(renamedRoute));
+      const http = createServer((incoming, outgoing) => {
+        const path = (incoming.url ?? "/").split("?")[0];
+        const rule = redirects.get(path);
         if (rule?.target) {
           outgoing
             .writeHead(Number(rule.status), { location: rule.target })
             .end();
-          return;
-        }
-        try {
-          const served = await fetch(url);
-          outgoing.writeHead(served.status, {
-            "content-type":
-              served.headers.get("content-type") ?? "application/octet-stream",
-          });
-          outgoing.end(Buffer.from(await served.arrayBuffer()));
-        } catch {
-          outgoing.writeHead(502).end();
+        } else if (path === renamedRoute) {
+          outgoing
+            .writeHead(200, { "content-type": "text/html; charset=utf-8" })
+            .end(canonicalHtml);
+        } else {
+          outgoing.writeHead(404).end();
         }
       });
       http.listen(0, "127.0.0.1");

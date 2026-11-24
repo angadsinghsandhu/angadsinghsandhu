@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import {
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   truncateSync,
   writeFileSync,
@@ -117,7 +118,11 @@ test("rejects a missing local fragment", async () => {
   await withProductionSnapshot((workspace) => {
     writeFileSync(
       join(output, "index.html"),
-      '<a href="#missing">Missing target</a>',
+      [
+        '<a href="https://external.example/article">Approved source</a>',
+        '<iframe src="https://external.example/media"></iframe>',
+        '<a href="#missing">Missing target</a>',
+      ].join(""),
     );
     rejectArtifact("Missing local fragment: / → /#missing", workspace);
   });
@@ -132,3 +137,49 @@ test("reserves _redirects for generated rules when there are no aliases", async 
     );
   });
 });
+
+test.each([
+  '<script type="module" src="//external.example/changed.js"></script>',
+  '<link rel="stylesheet" href="https://external.example/changed.css">',
+  '<link rel="modulepreload" href="https://external.example/changed.js">',
+  '<section data-pdf-url="https://external.example/moved.pdf"></section>',
+])("rejects a cross-origin owned runtime reference %s", async (markup) => {
+  await withProductionSnapshot((workspace) => {
+    writeFileSync(join(output, "index.html"), markup);
+    rejectArtifact("Cross-origin runtime asset: / → ", workspace);
+  });
+});
+
+test.each(["missing", "corrupt"] as const)(
+  "rejects a %s Pagefind runtime file bound by the private receipt",
+  async (damage) => {
+    await withProductionSnapshot((workspace) => {
+      const path = "/pagefind/index/en_test.pf_index";
+      writeFileSync(
+        join(workspace, ".generated/pages-search-inventory.json"),
+        JSON.stringify({
+          ...JSON.parse(
+            readFileSync(
+              join(workspace, notesSnapshotDirectory, "current.json"),
+              "utf8",
+            ),
+          ),
+          origin: "https://portfolio.example",
+          files: {
+            [path]: createHash("sha256").update("index bytes").digest("hex"),
+          },
+        }),
+      );
+      if (damage === "corrupt") {
+        mkdirSync(join(output, "pagefind", "index"), { recursive: true });
+        writeFileSync(join(output, path), "corrupt bytes");
+      }
+      rejectArtifact(
+        damage === "missing"
+          ? `Missing Pagefind file: ${path}`
+          : `Pagefind file digest differs: ${path}`,
+        workspace,
+      );
+    });
+  },
+);
