@@ -1,5 +1,6 @@
 import { posix } from "node:path";
 import { buildFolders, flattenFolders } from "./notes-folders.ts";
+import { notesLicenseFiles } from "./notes-license-files.ts";
 import { buildOrganizationIndex } from "./notes-organization.ts";
 import { isReaderNote } from "./notes-paths.ts";
 import type { NotesSnapshot } from "./notes-snapshot.ts";
@@ -99,6 +100,9 @@ export function claimNotesRoutes(
       `Portfolio ${route}`,
       route.endsWith("/") || route.endsWith("/index.html"),
     );
+  if (manifest.entries.length)
+    for (const { output } of notesLicenseFiles)
+      claim("/" + output, "Notes license /" + output, false);
   for (const asset of manifest.assets)
     claim(asset.publicPath, `Notes asset ${asset.publicPath}`, false);
   for (const route of libraryPages) page(route, `Library ${route}`);

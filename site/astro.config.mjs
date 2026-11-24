@@ -1,10 +1,11 @@
 import { execFileSync } from "node:child_process";
 import { constants } from "node:fs";
 import { copyFile, mkdir } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "astro/config";
 import { stagePdfAssets } from "./scripts/pdf-assets.ts";
+import { notesLicenseFiles } from "./src/lib/notes-license-files.ts";
 
 const origin = process.env.PORTFOLIO_ORIGIN;
 if (process.env.PORTFOLIO_NOTES_BUILD_RECEIPT && !origin)
@@ -52,23 +53,16 @@ export default defineConfig({
           execFileSync(resolve("node_modules/.bin/pagefind"), ["--site", out], {
             stdio: "inherit",
           });
-          const licenses = join(out, "licenses");
-          await mkdir(licenses, { recursive: true });
           await Promise.all(
-            [
-              ["katex/LICENSE", "katex.txt"],
-              ["pagefind/LICENSE/LICENSE", "pagefind.txt"],
-              [
-                "pagefind/LICENSE/LICENSE-vscode-ripgrep",
-                "pagefind-vscode-ripgrep.txt",
-              ],
-            ].map(([source, target]) =>
-              copyFile(
+            notesLicenseFiles.map(async ({ source, output }) => {
+              const target = join(out, output);
+              await mkdir(dirname(target), { recursive: true });
+              await copyFile(
                 resolve("node_modules", source),
-                join(licenses, target),
+                target,
                 constants.COPYFILE_EXCL,
-              ),
-            ),
+              );
+            }),
           );
         },
       },

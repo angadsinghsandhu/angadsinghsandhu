@@ -41,6 +41,30 @@ it("rejects a directory claim whose parent is an existing public file", () => {
   ).toThrow(/output collision at \/download\.pdf/i);
 });
 
+it.each([
+  "/licenses/katex.txt/",
+  "/licenses/katex.txt/old-note/",
+  "/licenses/pagefind.txt/",
+  "/licenses/pagefind-vscode-ripgrep.txt/old-note/",
+  "/LICENSES/%6Batex.txt/",
+])("rejects an alias that collides with a generated license %s", (alias) => {
+  const data = snapshot();
+  data.entries[0]!.aliases = [alias];
+  expect(() => claimNotesRoutes({ manifest: data }, existing)).toThrow(
+    /Notes license/u,
+  );
+});
+
+it("allows an alias elsewhere in the licenses directory", () => {
+  const data = snapshot();
+  data.entries[0]!.aliases = ["/licenses/legacy/"];
+  expect(
+    claimNotesRoutes({ manifest: data }, existing).aliases.get(
+      "/licenses/legacy/",
+    ),
+  ).toBe(data.entries[0]!.route);
+});
+
 it("rejects a cyclic topic hierarchy before claiming routes", () => {
   const data = snapshot();
   data.organization.topics = [
