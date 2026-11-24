@@ -18,6 +18,10 @@ The origin must match the approved release hostname. An HTTPS rehearsal origin i
 
 Keep the verifier output alongside the release evidence. The private Pagefind inventory in `site/.generated/pages-search-inventory.json` accompanies certification and stays outside the upload. The verifier output records the Notes revision and manifest digest, route differences, fragment and search counts, and the largest files. Retain the reviewed source identity and import receipt in CI. Keep the manifest, receipts, trace packages and other private material outside the upload directory. Upload only the exact verified artifact after launch authorization.
 
+## Pull request verification
+
+The required `Verify portfolio` job runs for opened, reopened and updated pull requests. It tests GitHub's pull request merge revision. The job then exports Notes from the public checkout pinned in the workflow, builds the combined artifact with `https://portfolio-preview.example`, verifies `dist/` and runs Chromium in archive mode. The pinned revision is an engineering fixture for PR verification. The job uses read-only repository access and writes the export and receipt in runner temporary storage.
+
 ## Release checks
 
 - Investigate every missing or extra route, fragment or search result. Fix the source or adjust the reviewed inventory before rebuilding. The Pages ceiling is 20,000 files and 25 MiB per file. Generated text is capped at 500 physical lines. Sitemap shards preserve all canonical URLs within that cap.
