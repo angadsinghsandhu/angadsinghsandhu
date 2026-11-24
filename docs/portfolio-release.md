@@ -35,9 +35,11 @@ The required `Verify portfolio` job runs for opened, reopened and updated pull r
 
 A dispatch carries `repository`, `ref`, `sha` and numeric `runId` in `client_payload`. Source selection verifies GitHub's sender and target repository, checks that the workflow SHA is the current protected Portfolio `main` commit, and checks Notes workflow `379127533` and its required `verify` job for the same protected Notes commit. A Portfolio push discovers the eligible Notes run for the current approved Notes head. A dispatch supplies the run to check. The chooser records both source SHAs and the Notes run ID and attempt.
 
-The build uses clean, SHA-pinned checkouts. After standalone verification, it exports Notes into runner temporary storage, imports the export and receipt, builds with the approved origin, certifies the output, and runs the Chromium archive suite. Successful runs retain only `site/dist` as `portfolio-candidate-<run ID>-<attempt>`, with the artifact ID and digest returned by GitHub. The candidate workflow has no deployment job or hosting credentials.
+The build uses clean, SHA-pinned checkouts. After standalone verification, it exports Notes into runner temporary storage, imports the export and receipt, builds with the approved origin, certifies the output, and runs the Chromium archive suite. The upload retains only `site/dist` as `portfolio-candidate-<run ID>-<attempt>`. The candidate workflow has no deployment job or hosting credentials.
 
-Production publication still requires an authorized Notes sender workflow, a bound release receipt and artifact, and an authorized, serialized publication gate that rechecks source freshness. Retained known-good state and rollback authorization belong to that gate.
+After upload, the build job rereads the validated production snapshot and checks GitHub artifact metadata with the job’s read-only Actions token. The check binds the artifact ID, archive SHA-256, repository, Portfolio revision and exact run-attempt name, and requires a current expiration. On success, the job exposes its separate JSON `release_receipt` output with the Portfolio and Notes SHAs, snapshot schema and manifest digest, run ID and attempt, artifact ID, and archive SHA-256. A failed check leaves the job without a receipt. The receipt stays outside the archive.
+
+Production publication still requires an authorized Notes sender workflow and an authorized, serialized publication gate that rechecks source freshness, verifies the downloaded archive digest against the receipt, and uses the checked artifact. Retained known-good state and rollback authorization belong to that gate.
 
 ## Release checks
 

@@ -96,7 +96,7 @@ function matchesNotesRun(
   );
 }
 
-async function readGitHub<T>(
+export async function readGitHub<T>(
   path: string,
   { token, http = fetch }: GitHubReader,
   schema: z.ZodType<T>,

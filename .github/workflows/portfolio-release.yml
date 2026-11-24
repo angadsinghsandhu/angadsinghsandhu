@@ -59,14 +59,16 @@ jobs:
     name: Verify and retain candidate
     needs: select
     if: needs.select.outputs.portfolio_sha != ''
+    permissions:
+      actions: read
+      contents: read
     runs-on: ubuntu-latest
     defaults:
       run:
         shell: bash
         working-directory: site
     outputs:
-      artifact_id: ${{ steps.candidate.outputs.artifact-id }}
-      artifact_digest: ${{ steps.candidate.outputs.artifact-digest }}
+      release_receipt: ${{ steps.receipt.outputs.release_receipt }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -108,3 +110,12 @@ jobs:
           path: site/dist
           if-no-files-found: error
           include-hidden-files: true
+      - name: Bind release receipt to the uploaded artifact
+        id: receipt
+        env:
+          PORTFOLIO_SHA: ${{ needs.select.outputs.portfolio_sha }}
+          NOTES_REVISION: ${{ needs.select.outputs.notes_sha }}
+          CANDIDATE_ARTIFACT_ID: ${{ steps.candidate.outputs.artifact-id }}
+          CANDIDATE_ARTIFACT_DIGEST: ${{ steps.candidate.outputs.artifact-digest }}
+          PORTFOLIO_ARTIFACT_TOKEN: ${{ github.token }}
+        run: node scripts/release-artifact-proof.ts

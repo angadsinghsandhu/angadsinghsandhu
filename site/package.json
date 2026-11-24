@@ -11,7 +11,7 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "format:check": "prettier --ignore-path ../.gitignore --check . ../.github/workflows/portfolio.yml",
+    "format:check": "prettier --ignore-path ../.gitignore --check . ../.github/workflows",
     "check:lines": "node scripts/check-lines.mjs",
     "lint": "eslint . --max-warnings 0",
     "check:boundaries": "eslint . --config eslint.boundaries.config.mjs --max-warnings 0",
