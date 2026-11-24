@@ -8,7 +8,9 @@ npx playwright install chromium
 npm run verify
 ```
 
-`npm run dev` starts the public shell. `npm run verify` checks formatting, physical line limits, Astro types, unit tests, the static build and Chromium navigation. The browser suite uses port 4389 for the built site and 4390 for its isolated fixture server.
+`npm run dev` starts the public shell. `npm run verify` checks formatting, physical line limits, ESLint, import boundaries, Astro types, unit tests, the static build and Chromium navigation. The browser suite uses port 4389 for the built site and 4390 for its isolated fixture server.
+
+Run `npm run lint` for JavaScript, TypeScript and Astro linting, including import rules. Run `npm run check:boundaries` for the import rules alone. Pages, layouts and components consume the prepared Notes catalog without reading files or importing build scripts directly. Browser modules and Astro client scripts use browser-safe dependencies.
 
 ## Editorial content
 

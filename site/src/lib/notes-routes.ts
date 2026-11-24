@@ -49,7 +49,11 @@ function assertSafePage(route: string, alias = false): void {
       !decoded ||
       decoded === "." ||
       decoded === ".." ||
-      /[/\\%\x00-\x1F\x7F]/u.test(decoded)
+      /[/\\%]/u.test(decoded) ||
+      [...decoded].some((character) => {
+        const code = character.charCodeAt(0);
+        return code < 0x20 || code === 0x7f;
+      })
     )
       throw new Error(`Invalid Notes route: ${route}`);
   }

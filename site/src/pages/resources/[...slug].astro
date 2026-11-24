@@ -4,7 +4,7 @@ import { readPreparedCatalog, type ReaderProps } from "../../lib/notes-catalog";
 export async function getStaticPaths() {
   return (await readPreparedCatalog()).readerPaths("/resources/");
 }
-interface Props extends ReaderProps {}
+type Props = ReaderProps;
 ---
 
 <ReaderLayout {...Astro.props} />

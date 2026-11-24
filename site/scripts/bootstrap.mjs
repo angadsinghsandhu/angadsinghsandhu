@@ -45,6 +45,7 @@ try {
         throw new AggregateError(
           [error, restoreError],
           `Previous dependencies kept at ${previous}`,
+          { cause: restoreError },
         );
       }
     }
