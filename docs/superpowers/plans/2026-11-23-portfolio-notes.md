@@ -91,9 +91,11 @@ P4 acceptance at Portfolio `192bdd6` preserved 6,279 reader routes, 3,487 fragme
 
 **Files:** Portfolio `site/scripts/verify-output.ts`, `site/tests/output.test.ts`, `docs/portfolio-release.md`.
 
-- [ ] Add named cases for an over-limit file, too many files, hidden draft payload and missing local fragment. Assert a nonzero failure before any artifact qualifies. Run `npx vitest run tests/output.test.ts` before implementation.
-- [ ] Implement `npm run verify:output -- --dir dist` to check real output after sitemap, redirects, Pagefind and PDF assets are emitted. Report counts, largest assets and route differences. Check assets and canonical URLs against expected origin, public inventory and route list. Keep provenance available to CI and out of search.
-- [ ] Run `npm run build && npm run verify:output -- --dir dist && npx playwright test` with the real snapshot. Record throttled mobile LCP and checks at 320px, tablet and desktop, and on a physical phone where available. Include approved content, playback, download and navigation evidence for release review. Commit the verifier and runbook.
+- [x] Add named cases for an over-limit file, too many files, hidden draft payload and missing local fragment. Assert a nonzero failure before any artifact qualifies. Run `npx vitest run tests/output.test.ts` before implementation.
+- [x] Implement `npm run verify:output -- --dir dist` to check real output after sitemap, redirects, Pagefind and PDF assets are emitted. Report counts, largest assets and route differences. Check assets and canonical URLs against expected origin, public inventory and route list. Keep provenance available to CI and out of search.
+- [x] Run `npm run build && npm run verify:output -- --dir dist && npx playwright test` with the real snapshot. Record throttled mobile LCP and checks at 320px, tablet and desktop, and on a physical phone where available. Include approved content, playback, download and navigation evidence for release review. Commit the verifier and runbook.
+
+The exact implementation at `09428f6` passed full shell and archive checks, artifact certification, and baseline parity. See the [release rehearsal](../../portfolio-release.md#local-release-rehearsal).
 
 ### Task 6. Connect automatic CI/CD before cutover
 

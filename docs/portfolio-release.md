@@ -16,7 +16,7 @@ PORTFOLIO_NOTES_BROWSER=archive npx playwright test
 
 The origin must match the approved release hostname. An HTTPS rehearsal origin is suitable for local certification. The release wrapper runs the Astro build, emits the Pagefind index and PDF runtime, copies the bound Notes assets, then writes the sitemap and any validated redirect rules. The verifier reads final `dist/` and the imported snapshot. A preview export and the shell-only build cannot serve as a release artifact.
 
-Keep the verifier output alongside the release evidence. The private Pagefind inventory in `site/.generated/pages-search-inventory.json` accompanies certification and stays outside the upload. It records the Notes revision and manifest digest, route differences, fragment and search counts, and the largest files. Retain the reviewed source identity and import receipt in CI. Keep the manifest, receipts, trace packages and other private material outside the upload directory. Upload only the exact verified artifact after launch authorization.
+Keep the verifier output alongside the release evidence. The private Pagefind inventory in `site/.generated/pages-search-inventory.json` accompanies certification and stays outside the upload. The verifier output records the Notes revision and manifest digest, route differences, fragment and search counts, and the largest files. Retain the reviewed source identity and import receipt in CI. Keep the manifest, receipts, trace packages and other private material outside the upload directory. Upload only the exact verified artifact after launch authorization.
 
 ## Release checks
 
@@ -30,5 +30,7 @@ For each authorized deployment, retain the exact artifact, manifest digest, Port
 ## Local release rehearsal
 
 On 2026-11-24 UTC, the combined build from Notes `5b040f280bbad62df1e1a9172a0f2ca067afc504` was served from localhost. Home, Library, Interview and Search fit 320px, 768px and 1440px Chromium viewports. The reader suite exercised folder paths, anchors, search filtering and a rendered PDF.
+
+The certified build held 16,040 files and preserved 9,023 canonical routes, including all 6,279 Notes reader routes. It verified 3,487 snapshot fragments, 6,279 search results and 505 bound files. The largest file was 21,722,117 bytes. The baseline comparison matched the parsed DOM of all 45 compacted reader pages after accounting for the new stylesheet fingerprint.
 
 Chromium measured home LCP across five cold navigations at 360 × 780 CSS pixels. The test disabled the cache and used 4× CPU slowdown, 150 ms network latency, 1.6 Mbps download and 0.75 Mbps upload. The values were 464, 464, 456, 456 and 448 ms. The median was 456 ms against a 2.5 s target. The final LCP element was the home heading on all five runs. This is localhost emulation. Physical-phone and live-host checks remain release evidence.
