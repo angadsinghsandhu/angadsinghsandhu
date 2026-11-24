@@ -141,10 +141,11 @@ function deny(reason: string): Denial {
 
 // Evidence must come from the authenticated GitHub reads, never the dispatch payload.
 export function evaluateNotesRevision(
-  candidate: NotesCandidate,
+  candidate: NotesCandidate | null | undefined,
   { approval, head, run, job }: EligibilityEvidence,
 ): EligibilityResult {
   if (
+    !candidate ||
     !approval ||
     !validNotesApproval(approval) ||
     candidate.repository !== approval.repository.name ||

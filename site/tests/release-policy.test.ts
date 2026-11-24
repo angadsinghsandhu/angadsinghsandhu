@@ -45,6 +45,13 @@ describe("Notes eligibility", () => {
     );
   });
 
+  it.each([undefined, null])(
+    "denies an absent dispatch candidate (%s)",
+    (absent) => {
+      expect(evaluateNotesRevision(absent, evidence).decision).toBe("deny");
+    },
+  );
+
   it.each([
     ["unknown repository", { repository: "example/other" }],
     ["unapproved ref", { ref: "refs/heads/main" }],
