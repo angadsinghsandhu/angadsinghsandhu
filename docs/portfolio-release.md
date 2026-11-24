@@ -22,6 +22,23 @@ Keep the verifier output alongside the release evidence. The private Pagefind in
 
 The required `Verify portfolio` job runs for opened, reopened and updated pull requests. It tests GitHub's pull request merge revision. The job then exports Notes from the public checkout pinned in the workflow, builds the combined artifact with `https://portfolio-preview.example`, verifies `dist/` and runs Chromium in archive mode. The pinned revision is an engineering fixture for PR verification. The job uses read-only repository access and writes the export and receipt in runner temporary storage.
 
+## Release candidate workflow
+
+`Portfolio release candidate` starts on pushes to Portfolio `main` and GitHub `repository_dispatch` events of type `portfolio-notes-verified`. The jobs are disabled unless `PORTFOLIO_RELEASE_CANDIDATE_ENABLED` is exactly `true`. Configure these repository settings before a candidate run:
+
+| Setting                             | Value                                                                                                                                                                            |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PORTFOLIO_RELEASE_NOTES_REF`       | The approved protected Notes branch as a full `refs/heads/…` ref.                                                                                                                |
+| `PORTFOLIO_RELEASE_NOTES_SENDER_ID` | The approved sender's numeric GitHub account ID, required for dispatch.                                                                                                          |
+| `PORTFOLIO_RELEASE_ORIGIN`          | The approved HTTPS origin to embed in the combined build.                                                                                                                        |
+| `PORTFOLIO_RELEASE_SOURCE_TOKEN`    | A repository secret with read-only access to repository metadata and branches in Portfolio and Notes and Actions runs and jobs in Notes. Only the source-proof step receives it. |
+
+A dispatch carries `repository`, `ref`, `sha` and numeric `runId` in `client_payload`. Source selection verifies GitHub's sender and target repository, checks that the workflow SHA is the current protected Portfolio `main` commit, and checks Notes workflow `379127533` and its required `verify` job for the same protected Notes commit. A Portfolio push discovers the eligible Notes run for the current approved Notes head. A dispatch supplies the run to check. The chooser records both source SHAs and the Notes run ID and attempt.
+
+The build uses clean, SHA-pinned checkouts. After standalone verification, it exports Notes into runner temporary storage, imports the export and receipt, builds with the approved origin, certifies the output, and runs the Chromium archive suite. Successful runs retain only `site/dist` as `portfolio-candidate-<run ID>-<attempt>`, with the artifact ID and digest returned by GitHub. The candidate workflow has no deployment job or hosting credentials.
+
+Production publication still requires an authorized Notes sender workflow, a bound release receipt and artifact, and an authorized, serialized publication gate that rechecks source freshness. Retained known-good state and rollback authorization belong to that gate.
+
 ## Release checks
 
 - Investigate every missing or extra route, fragment or search result. Fix the source or adjust the reviewed inventory before rebuilding. The Pages ceiling is 20,000 files and 25 MiB per file. Generated text is capped at 500 physical lines. Sitemap shards preserve all canonical URLs within that cap.

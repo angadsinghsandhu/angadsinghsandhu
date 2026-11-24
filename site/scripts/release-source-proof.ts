@@ -3,7 +3,7 @@ import {
   evaluateNotesRevision,
   type EligibilityEvidence,
   type NotesCandidate,
-} from "./release-policy";
+} from "./release-policy.ts";
 
 type Source = NonNullable<EligibilityEvidence["approval"]>;
 type ProtectedSource = Pick<Source, "repository" | "ref">;

@@ -214,7 +214,7 @@ test.describe("validated archive", () => {
       );
       await expect(page.locator("link[rel=canonical]")).toHaveAttribute(
         "href",
-        `${previewOrigin}${chapter}`,
+        `${new URL(process.env.PORTFOLIO_ORIGIN ?? previewOrigin).origin}${chapter}`,
       );
     } finally {
       await context.close();
