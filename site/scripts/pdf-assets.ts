@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 const require = createRequire(import.meta.url);
 const distribution = dirname(require.resolve("pdfjs-dist/package.json"));
 /** Exact files from the pinned distribution; PDF scripting (QuickJS) is never staged. */
-async function pdfAssets(): Promise<Map<string, Buffer>> {
+export async function pdfAssets(): Promise<Map<string, Buffer>> {
   const files = new Map<string, Buffer>();
   files.set("LICENSE", await readFile(join(distribution, "LICENSE")));
   files.set(

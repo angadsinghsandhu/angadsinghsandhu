@@ -1,4 +1,6 @@
 import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { createServer } from "node:http";
+import { once } from "node:events";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
@@ -123,12 +125,61 @@ test("isolated preview rebuild adds, edits, renames, and removes reader output",
       await page.getByRole("button", { name: "Search", exact: true }).click();
       await expect(page.getByRole("status")).toHaveText(/no results/i);
       const noScript = await browser.newContext({ javaScriptEnabled: false });
+      const redirects = new Map(
+        (await readFile(join(output, "_redirects"), "utf8"))
+          .trimEnd()
+          .split("\n")
+          .map((line) => {
+            const [source, target, status] = line.split(" ");
+            return [source, { target, status }] as const;
+          }),
+      );
+      const http = createServer(async (incoming, outgoing) => {
+        const url = new URL(incoming.url ?? "/", address);
+        const rule = redirects.get(url.pathname);
+        if (rule?.target) {
+          outgoing
+            .writeHead(Number(rule.status), { location: rule.target })
+            .end();
+          return;
+        }
+        try {
+          const served = await fetch(url);
+          outgoing.writeHead(served.status, {
+            "content-type":
+              served.headers.get("content-type") ?? "application/octet-stream",
+          });
+          outgoing.end(Buffer.from(await served.arrayBuffer()));
+        } catch {
+          outgoing.writeHead(502).end();
+        }
+      });
+      http.listen(0, "127.0.0.1");
+      await once(http, "listening");
+      const listener = http.address();
+      if (!listener || typeof listener === "string")
+        throw new Error("Missing HTTP rehearsal listener");
+      const rehearsal = `http://127.0.0.1:${listener.port}`;
       try {
         const fallback = await noScript.newPage();
         await fallback.goto(address + encodedAlias);
         await expect(fallback).toHaveURL(address + renamedRoute);
+        for (const alias of [originalRoute, encodedAlias]) {
+          const response = await request.get(rehearsal + alias, {
+            maxRedirects: 0,
+          });
+          expect(response.status()).toBe(308);
+          expect(response.headers()["location"]).toBe(renamedRoute);
+          await fallback.goto(`${rehearsal}${alias}#proof`);
+          await expect(fallback).toHaveURL(`${rehearsal}${renamedRoute}#proof`);
+          await expect(fallback.locator(":target")).toHaveText(
+            "The revised proof is present.",
+          );
+        }
       } finally {
         await noScript.close();
+        http.close();
+        await once(http, "close");
       }
     } finally {
       await server.stop();
@@ -201,6 +252,22 @@ test.describe("validated archive", () => {
     ).toBe(320);
   });
 
+  for (const width of [768, 1280]) {
+    test(`reader content and fragment stay usable at ${width}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(`${chapter}#tensor-broadcasting`);
+      await expect(page.locator(":target")).toHaveText("Tensor Broadcasting");
+      await expect(
+        page.getByRole("link", { name: "Search", exact: true }).first(),
+      ).toBeAttached();
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+      ).toBe(width);
+    });
+  }
+
   test("organization links keep book chapters and React project trees", async ({
     page,
   }) => {
@@ -230,7 +297,15 @@ test.describe("validated archive", () => {
   test("scoped search indexes learning text and exposes supplemental resources in All files", async ({
     page,
   }) => {
+    await page.setViewportSize({ width: 320, height: 720 });
     await page.goto("/search/");
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(320);
+    const collectionFilter = page.getByLabel("Collection");
+    const filterBounds = await collectionFilter.boundingBox();
+    expect(filterBounds).not.toBeNull();
+    expect(filterBounds!.x + filterBounds!.width).toBeLessThanOrEqual(320);
     await page
       .getByLabel("Search notes and resources")
       .fill("tensor broadcasting");
@@ -271,6 +346,16 @@ test.describe("validated archive", () => {
     await expect(
       page.getByRole("link", { name: "Open PDF", exact: true }),
     ).toHaveAttribute("href", /\/content-assets\/[^/]+\.pdf$/);
+    const pdfDownload = page.getByRole("link", {
+      name: "Download PDF",
+      exact: true,
+    });
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      pdfDownload.click(),
+    ]);
+    const bytes = await readFile(await download.path());
+    expect(bytes.subarray(0, 5).toString("ascii")).toBe("%PDF-");
     await page.goto(externalPdf);
     await expect(
       page.getByRole("link", { name: "Open external source" }),

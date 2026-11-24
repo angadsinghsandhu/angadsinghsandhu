@@ -1,9 +1,13 @@
 import { execFileSync } from "node:child_process";
 import { constants } from "node:fs";
-import { copyFile, mkdir } from "node:fs/promises";
+import { copyFile, mkdir, unlink } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "astro/config";
+import {
+  compactOutputHtml,
+  unusedPagefindFiles,
+} from "./scripts/output-text.ts";
 import { stagePdfAssets } from "./scripts/pdf-assets.ts";
 import { notesLicenseFiles } from "./src/lib/notes-license-files.ts";
 
@@ -39,9 +43,13 @@ export default defineConfig({
     {
       name: "portfolio-notes-assets",
       hooks: {
-        "astro:build:done": async ({ dir, pages }) => {
+        "astro:build:done": async ({ dir, pages, assets }) => {
           if (!process.env.PORTFOLIO_NOTES_BUILD_RECEIPT) return;
           const out = fileURLToPath(dir);
+          for (const files of assets.values())
+            for (const file of files)
+              if (file.pathname.endsWith(".html"))
+                await compactOutputHtml(fileURLToPath(file));
           if (process.env.PORTFOLIO_NOTES_LOCAL_PDF === "1")
             await stagePdfAssets(join(out, "pdfjs"));
           if (
@@ -53,6 +61,11 @@ export default defineConfig({
           execFileSync(resolve("node_modules/.bin/pagefind"), ["--site", out], {
             stdio: "inherit",
           });
+          await Promise.all(
+            unusedPagefindFiles.map((file) =>
+              unlink(join(out, "pagefind", file)),
+            ),
+          );
           await Promise.all(
             notesLicenseFiles.map(async ({ source, output }) => {
               const target = join(out, output);

@@ -239,6 +239,7 @@
 .search-form,
 .search-field {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.75rem;
 }
 
@@ -255,7 +256,9 @@
 
 .search-filters label {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   flex: 1 1 12rem;
+  min-width: 0;
   gap: 0.35rem;
 }
 

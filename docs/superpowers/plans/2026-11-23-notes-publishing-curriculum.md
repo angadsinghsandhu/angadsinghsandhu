@@ -57,16 +57,20 @@ Test a renamed source with stable IDs and redirects in N1/N2, a conflicting assi
 
 ### N2. Verify authoring and notifications
 
-- [ ] Exercise create, edit, rename and removal from the Notes authoring workflow. Assert the next snapshot reflects each reviewed change, has no stale entries and excludes private/draft content. Preserve the existing Notes-only verification path through cutover.
+- [x] Exercise create, edit, rename and removal from the Notes authoring workflow. Assert the next snapshot reflects each reviewed change, has no stale entries and excludes private/draft content. Preserve the existing Notes-only verification path through cutover.
 - [ ] Run required Notes verification on every PR open, reopen and update. Exercise the 500-line check, archive parity, curriculum checks and exporter contract. On push to the approved publication branch, reverify the exact landed SHA. Test that a successful source edit triggers one effective Portfolio release and that a failed run produces no dispatch.
 - [ ] Extend the trusted branch workflow only after confirming publication ref policy. Emit the exact verified full SHA and dispatch only after successful upstream CI once production automation is authorized. Test false cases for PR refs, failed runs and mismatched revisions. Keep secrets and production dispatch disabled for pull requests. Portfolio plan Task 6 owns receiving and deployment verification.
 
+Notes `c278c88` passed the authoring and offline notification rehearsal. The approved publication ref, real dispatch and durable release deduplication are pending. [Notes PR #52](https://github.com/angadsinghsandhu/Notes/pull/52)
+
 ### N3. Reconcile official identities and pilot evidence
 
-- [ ] Before editing the large baseline catalogs, split authored manifest, source-map and path records into bounded, readable files by problem range or path stage. Use a small ordered index per collection, with further subdivision wherever formatting exceeds 500 lines. Compare the assembled records with the original full dataset, including order, hashes, references and statuses. Keep the logical curriculum schema stable for TypeScript preparation, Python verification, publishing and authoring. Test both the legacy layout and the new layout, including missing and duplicate shards. Apply the same rule to new batch, coverage and trace files. Generated aggregate views belong in build staging.
+- [x] Before editing the large baseline catalogs, split authored manifest, source-map and path records into bounded, readable files by problem range or path stage. Use a small ordered index per collection, with further subdivision wherever formatting exceeds 500 lines. Compare the assembled records with the original full dataset, including order, hashes, references and statuses. Keep the logical curriculum schema stable for TypeScript preparation, Python verification, publishing and authoring. Test both the legacy layout and the new layout, including missing and duplicate shards. Apply the same rule to new batch, coverage and trace files. Generated aggregate views belong in build staging.
 - [ ] Begin with the target manifest, the 366 archived solutions and original byte hashes. Reconcile archived filenames to official IDs using evidence. Keep ambiguous matches and unavailable facts explicit. Do not infer identity from a filename alone.
-- [ ] Resolve and record the eight pilots, IDs **1, 3, 20, 64, 98, 127, 146 and 175**. Record official URLs, identity evidence, constraints with provenance, archive or new-code origin, and selection of meaningful approaches. Check the current records rather than repeating already verified research.
+- [x] Resolve and record the eight pilots, IDs **1, 3, 20, 64, 98, 127, 146 and 175**. Record official URLs, identity evidence, constraints with provenance, archive or new-code origin, and selection of meaningful approaches. Check the current records rather than repeating already verified research.
 - [ ] Run the curriculum validator against one archive source assigned to conflicting IDs (multiple genuine variants of one problem are valid), a wrong official URL and missing official evidence. Assert those records cannot be promoted. Commit the approved pilot evidence separately from publication.
+
+Notes `5c42bac` passed local verification of catalog sharding and the eight pilot identities. All 366 archive digests matched. Individual reconciliation remains open for 188 archive records. [Notes PR #53](https://github.com/angadsinghsandhu/Notes/pull/53)
 
 ### N4. Complete the eight pilots and lock the lesson standard
 

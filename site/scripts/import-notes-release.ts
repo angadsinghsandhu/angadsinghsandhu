@@ -1,48 +1,14 @@
 import { execFileSync } from "node:child_process";
-import { readdir } from "node:fs/promises";
-import { resolve } from "node:path";
-import {
-  approved,
-  indexes,
-  projects,
-  releases,
-} from "../src/content/editorial.ts";
-import { claimNotesRoutes } from "../src/lib/notes-routes.ts";
+import { writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
+import { outputOrigin } from "./notes-redirects.ts";
+import { releaseInventory } from "./output-inventory.ts";
 import {
   copyNotesPagesAssets,
   notesSnapshotDirectory,
   readNotesSnapshot,
   readProductionNotesSnapshot,
 } from "../src/lib/notes-snapshot.ts";
-
-async function portfolioRoutes() {
-  const routes = new Set([
-    "/",
-    "/projects/",
-    "/music/",
-    "/resume/",
-    "/interview/",
-    "/404.html",
-    "/sitemap.xml",
-    ...Object.keys(indexes)
-      .filter((index) => index !== "library")
-      .map((index) => `/${index}/`),
-    ...approved(projects).map(({ slug }) => `/projects/${slug}/`),
-    ...approved(releases).map(({ slug }) => `/music/${slug}/`),
-  ]);
-  const directory = resolve("public");
-  const files = await readdir(directory, {
-    recursive: true,
-    withFileTypes: true,
-  }).catch((error: NodeJS.ErrnoException) => {
-    if (error.code !== "ENOENT") throw error;
-    return [];
-  });
-  for (const file of files)
-    if (file.isFile())
-      routes.add(`${file.parentPath.slice(directory.length)}/${file.name}`);
-  return routes;
-}
 
 try {
   const [mode, revision, ...extra] = process.argv.slice(2);
@@ -55,7 +21,8 @@ try {
   const snapshot = preview
     ? await readNotesSnapshot(directory, revision)
     : await readProductionNotesSnapshot(directory);
-  claimNotesRoutes(snapshot, await portfolioRoutes());
+  const origin = outputOrigin(process.env.PORTFOLIO_ORIGIN);
+  const { metadata } = releaseInventory(snapshot, origin);
   const localPdf = snapshot.manifest.entries.some(
     ({ kind, assetUrl }) =>
       kind === "pdf" && assetUrl?.startsWith("/content-assets/"),
@@ -70,6 +37,8 @@ try {
     },
   });
   await copyNotesPagesAssets(snapshot, resolve(output));
+  for (const [filename, content] of metadata)
+    await writeFile(join(output, filename), content, { flag: "wx" });
 } catch (error) {
   console.error(String(error));
   process.exitCode = 1;
