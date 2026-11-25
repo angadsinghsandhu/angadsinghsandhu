@@ -17,9 +17,17 @@ const script = fileURLToPath(
   new URL("../../scripts/stage-release-archive.py", import.meta.url),
 );
 const generated = fileURLToPath(new URL("../../.generated/", import.meta.url));
+const pythonOptions = {
+  encoding: "utf8",
+  timeout: 10_000,
+  killSignal: "SIGKILL",
+} as const;
+
 const fixture = String.raw`
 import io, json, struct, sys, warnings, zipfile, zlib
-archive, damage = sys.argv[1:]
+archive, damage, entries_path = sys.argv[1:]
+with open(entries_path, encoding="utf8") as entries_file:
+    entries = json.load(entries_file)
 warnings.filterwarnings("ignore", message="Duplicate name:")
 if damage == "zip64":
     zipfile.ZIP64_LIMIT = 1
@@ -28,7 +36,7 @@ class Nonseekable(io.BytesIO):
         raise io.UnsupportedOperation("seek")
 buffer = Nonseekable() if damage == "descriptor" else None
 with zipfile.ZipFile(buffer if buffer is not None else archive, "w") as output:
-    for name, mode in json.load(sys.stdin):
+    for name, mode in entries:
         member = zipfile.ZipInfo(name)
         member.external_attr = mode << 16
         if damage == "large-directory":
@@ -94,20 +102,32 @@ describe("checked release archive staging", () => {
   afterEach(() => rmSync(directory, { recursive: true, force: true }));
 
   function zip(names: string[], damage = "", mode = 0o100644) {
-    const result = spawnSync("python3", ["-c", fixture, archive, damage], {
-      encoding: "utf8",
-      input: JSON.stringify(
+    const entries = join(directory, "entries.json");
+    writeFileSync(
+      entries,
+      JSON.stringify(
         names.map((name) => [name, name.endsWith("/") ? 0o40755 : mode]),
       ),
-    });
+    );
+    const result = spawnSync(
+      "python3",
+      ["-c", fixture, archive, damage, entries],
+      pythonOptions,
+    );
+    rmSync(entries);
+    expect(result.error).toBeUndefined();
     expect(result.stderr).toBe("");
     expect(result.status).toBe(0);
   }
 
   function stage() {
-    return spawnSync("python3", [script, archive, output], {
-      encoding: "utf8",
-    });
+    const result = spawnSync(
+      "python3",
+      [script, archive, output],
+      pythonOptions,
+    );
+    expect(result.error).toBeUndefined();
+    return result;
   }
 
   function rejectArchive(message: RegExp) {
