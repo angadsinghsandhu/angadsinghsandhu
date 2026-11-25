@@ -10,7 +10,7 @@ import {
   readProtectedHead,
 } from "./release-source-proof.ts";
 
-type VerifiedRelease = {
+export type VerifiedRelease = {
   receipt: ReleaseReceipt;
   notesCandidate: NotesCandidate;
   notesRunAttempt: number;
@@ -31,9 +31,9 @@ type PublicationGate = {
   activate: (receipt: ReleaseReceipt, archive: Uint8Array) => Promise<void>;
 };
 
-async function readReleaseSources(
+export async function readReleaseSources(
   verified: VerifiedRelease,
-  { approval, sourceApi }: PublicationGate,
+  { approval, sourceApi }: Pick<PublicationGate, "approval" | "sourceApi">,
 ): Promise<
   Pick<ReleaseEvidence, "portfolioHead" | "notesHead" | "notesProof">
 > {
