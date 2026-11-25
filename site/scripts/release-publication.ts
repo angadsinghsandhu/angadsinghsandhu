@@ -10,6 +10,12 @@ import {
   readProtectedHead,
 } from "./release-source-proof.ts";
 
+type VerifiedRelease = {
+  receipt: ReleaseReceipt;
+  notesCandidate: NotesCandidate;
+  notesRunAttempt: number;
+};
+
 type PublicationGate = {
   approval: NonNullable<ReleaseEvidence["approval"]>;
   serialized: <Result>(operation: () => Promise<Result>) => Promise<Result>;
@@ -18,14 +24,34 @@ type PublicationGate = {
   readActive: () => Promise<ReleaseReceipt | null | undefined>;
   readVerified: (
     receipt: ReleaseReceipt,
-  ) => Promise<
-    { receipt: ReleaseReceipt; notesCandidate: NotesCandidate } | undefined
-  >;
+  ) => Promise<VerifiedRelease | undefined>;
   readAuthorizedRollback: (
     receipt: ReleaseReceipt,
   ) => Promise<ReleaseReceipt | undefined>;
   activate: (receipt: ReleaseReceipt, archive: Uint8Array) => Promise<void>;
 };
+
+async function readReleaseSources(
+  verified: VerifiedRelease,
+  { approval, sourceApi }: PublicationGate,
+): Promise<
+  Pick<ReleaseEvidence, "portfolioHead" | "notesHead" | "notesProof">
+> {
+  const { notesCandidate, notesRunAttempt } = verified;
+  const [portfolioHead, notes] = await Promise.all([
+    readProtectedHead(approval.portfolio, sourceApi),
+    readNotesEvidence(notesCandidate, approval.notes, sourceApi),
+  ]);
+  return {
+    portfolioHead,
+    notesHead: notes.head,
+    notesProof: {
+      candidate: notesCandidate,
+      run: notes.run?.attempt === notesRunAttempt ? notes.run : undefined,
+      job: notes.job?.runAttempt === notesRunAttempt ? notes.job : undefined,
+    },
+  };
+}
 
 export function publishRelease(
   input: ReleaseEvidence["request"],
@@ -41,26 +67,13 @@ export function publishRelease(
       kind === "rollback"
         ? await gate.readAuthorizedRollback(receipt)
         : undefined;
-    const { approval, sourceApi } = gate;
-    const [portfolioHead, notes] = verified
-      ? await Promise.all([
-          readProtectedHead(approval.portfolio, sourceApi),
-          readNotesEvidence(verified.notesCandidate, approval.notes, sourceApi),
-        ])
-      : [];
     const evidence: ReleaseEvidence = {
       request,
-      approval,
+      approval: gate.approval,
       active,
       verified: verified?.receipt,
       authorizedRollback,
-      portfolioHead,
-      notesHead: notes?.head,
-      notesProof: verified && {
-        candidate: verified.notesCandidate,
-        run: notes?.run,
-        job: notes?.job,
-      },
+      ...(verified && (await readReleaseSources(verified, gate))),
       // Preflight uses the trusted receipt. Activation requires the current metadata and checked bytes.
       artifact: verified?.receipt ?? authorizedRollback,
     };
@@ -70,14 +83,9 @@ export function publishRelease(
 
     const archive = await readReleaseArtifactArchive(receipt, gate.artifact);
     if (verified) {
-      const [portfolioHead, notesHead] = await Promise.all([
-        readProtectedHead(approval.portfolio, sourceApi),
-        readProtectedHead(approval.notes, sourceApi),
-      ]);
       const refreshed = evaluateRelease({
         ...evidence,
-        portfolioHead,
-        notesHead,
+        ...(await readReleaseSources(verified, gate)),
       });
       if (refreshed.decision !== "publish") return refreshed;
     }

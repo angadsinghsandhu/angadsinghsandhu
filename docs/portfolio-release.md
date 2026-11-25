@@ -49,9 +49,9 @@ The rehearsal uses GitHub response fixtures, two ZIP archives and a shared activ
 npx vitest run tests/scripts/release-publication.test.ts tests/scripts/release-artifact-{download,transport}.test.ts
 ```
 
-The publication gate reads the current active receipt and rechecks both protected heads after acquiring the shared lock. It denies stale pairs and skips active duplicates before archive retrieval. It checks GitHub metadata for the receipt's exact archive ID, run, attempt, repository, Portfolio revision, digest and expiry, then hashes the downloaded archive bytes. For a normal release, it rereads both protected heads immediately before activation.
+The publication gate reads the current active receipt and rechecks both protected heads after acquiring the shared lock. For a normal release, it also requires the successful Notes run and required job to match the exact attempt in the trusted verified build record. It denies stale pairs and skips active duplicates before archive retrieval. It checks GitHub metadata for the receipt's exact archive ID, run, attempt, repository, Portfolio revision, digest and expiry, then hashes the downloaded archive bytes. After archive validation, it rechecks both protected heads and the pinned Notes run and job before activation. A newer Notes attempt blocks activation even when it succeeds for the same commit.
 
-Rollback requires explicit authorization for the exact retained known-good receipt, even when its source heads have advanced. It uses the same metadata and byte checks. If the archive is expired, missing or has a different digest, the gate leaves the active release in place.
+Rollback requires explicit authorization for the exact retained known-good receipt, even when its source heads have advanced. It uses the same metadata and byte checks and can restore the retained archive without fresh source evidence. If the archive is expired, missing or has a different digest, the gate leaves the active release in place.
 
 The rehearsal uses unexpired GitHub artifacts for rollback verification. If the approved rollback window exceeds CI artifact expiry, the production adapter needs retained archives or restorable deployments with trustworthy stored identity and digest evidence. Production releases and rollbacks must share the same serialization gate. The activation adapter must keep the deployment and durable active receipt consistent across failures and retries.
 
@@ -61,7 +61,7 @@ The API request has a 15-second deadline and the storage request has five minute
 
 ### Production state inputs
 
-Workflow outputs carry the receipt for the current run. GitHub artifact metadata identifies the Portfolio run and archive. For `readVerified`, persist the verified release receipt and the successful candidate build proof together in trusted durable storage after the checks and receipt binding pass. Include the exact Notes verification repository, ref, workflow ID, run ID and attempt, and the required job's success for the receipt's Notes SHA. The stored proof binds that SHA and the snapshot manifest digest to the checked candidate.
+Workflow outputs carry the receipt for the current run. GitHub artifact metadata identifies the Portfolio run and archive. For `readVerified`, persist the verified release receipt and the successful candidate build proof together in trusted durable storage after the checks and receipt binding pass. Include the exact Notes verification repository, ref, workflow ID, run ID and attempt, and the required job's success for the receipt's Notes SHA. Return the selected `notes_run_attempt` from source selection as `notesRunAttempt` alongside the receipt and Notes candidate in the trusted `readVerified` record. The stored proof binds that SHA and the snapshot manifest digest to the checked candidate.
 
 Keep a separate durable history of confirmed known-good deployments with their exact receipts. For `readAuthorizedRollback`, look up the requested receipt in that history and require explicit rollback approval bound to the selected retained record. Return the stored receipt only when both the record and that approval match.
 

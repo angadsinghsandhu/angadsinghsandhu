@@ -62,6 +62,11 @@ function fixture(active: ReleaseReceipt | null = null, retained = earlier) {
       : null,
     heads: { portfolioSha: current.portfolioSha, notesSha: current.notesSha },
     authorizedRollback: undefined as ReleaseReceipt | undefined,
+    notesRun: {
+      attempt: notesRunAttempt,
+      status: "completed",
+      conclusion: "success" as string | null,
+    },
   };
   const artifacts = new Map([
     [retained.artifactId, retained],
@@ -91,8 +96,8 @@ function fixture(active: ReleaseReceipt | null = null, retained = earlier) {
   const sourceHttp = vi.fn<typeof fetch>(async (url) => {
     const notesCheck = {
       head_sha: state.heads.notesSha,
-      status: "completed",
-      conclusion: "success",
+      status: state.notesRun.status,
+      conclusion: state.notesRun.conclusion,
     };
     switch (url) {
       case portfolioPath:
@@ -118,14 +123,15 @@ function fixture(active: ReleaseReceipt | null = null, retained = earlier) {
         return Response.json({
           ...notesCheck,
           id: notesRunId,
-          run_attempt: notesRunAttempt,
+          run_attempt: state.notesRun.attempt,
           workflow_id: approval.notes.workflowId,
           repository: notesRepository,
           head_repository: notesRepository,
           head_branch: "publish",
           event: "push",
         });
-      case notesPath + "/actions/runs/900/attempts/4/jobs?per_page=100":
+      case notesPath +
+        `/actions/runs/900/attempts/${state.notesRun.attempt}/jobs?per_page=100`:
         return Response.json({
           total_count: 1,
           jobs: [
@@ -133,7 +139,7 @@ function fixture(active: ReleaseReceipt | null = null, retained = earlier) {
               ...notesCheck,
               name: "verify",
               run_id: notesRunId,
-              run_attempt: notesRunAttempt,
+              run_attempt: state.notesRun.attempt,
             },
           ],
         });
@@ -190,6 +196,7 @@ function fixture(active: ReleaseReceipt | null = null, retained = earlier) {
         if (!receipt) return undefined;
         return {
           receipt: structuredClone(receipt),
+          notesRunAttempt,
           notesCandidate: {
             repository: approval.notes.repository.name,
             ref: approval.notes.ref,
@@ -324,6 +331,7 @@ it("restores only the entitled artifact for an older pair and skips an identical
   await expect(
     publishRelease(rollback, rehearsal.dependencies()),
   ).resolves.toEqual({ decision: "noop" });
+  expect(rehearsal.sourceHttp).not.toHaveBeenCalled();
   expect(rehearsal.readArchive).toHaveBeenCalledExactlyOnceWith(100);
   expect(rehearsal.state.active).toEqual(earlier);
   expect(rehearsal.state.activatedArchive).toEqual(earlierArchive);
@@ -368,6 +376,54 @@ it.each(["portfolioSha", "notesSha"] as const)(
     ).resolves.toMatchObject({
       decision: "deny",
       reason: expect.stringContaining("current protected head"),
+    });
+    expect(rehearsal.readArchive).toHaveBeenCalledExactlyOnceWith(200);
+    expect(rehearsal.activate).not.toHaveBeenCalled();
+    expect(rehearsal.state.active).toEqual(earlier);
+    expect(rehearsal.state.activatedArchive).toEqual(earlierArchive);
+  },
+);
+
+it("denies a newer successful Notes attempt before fetching the artifact", async () => {
+  const rehearsal = fixture(earlier);
+  rehearsal.state.notesRun.attempt++;
+
+  await expect(
+    publishRelease(
+      { kind: "release", receipt: current },
+      rehearsal.dependencies(),
+    ),
+  ).resolves.toMatchObject({
+    decision: "deny",
+    reason: expect.stringContaining("Notes verification run"),
+  });
+  expect(rehearsal.artifactHttp).not.toHaveBeenCalled();
+  expect(rehearsal.readArchive).not.toHaveBeenCalled();
+  expect(rehearsal.activate).not.toHaveBeenCalled();
+  expect(rehearsal.state.active).toEqual(earlier);
+});
+
+it.each(["completed", "in_progress"])(
+  "denies a newer %s Notes attempt before activation after retrieving the archive",
+  async (status) => {
+    const rehearsal = fixture(earlier);
+    rehearsal.readArchive.mockImplementationOnce(async () => {
+      rehearsal.state.notesRun = {
+        attempt: notesRunAttempt + 1,
+        status,
+        conclusion: status === "completed" ? "success" : null,
+      };
+      return currentArchive;
+    });
+
+    await expect(
+      publishRelease(
+        { kind: "release", receipt: current },
+        rehearsal.dependencies(),
+      ),
+    ).resolves.toMatchObject({
+      decision: "deny",
+      reason: expect.stringContaining("Notes verification run"),
     });
     expect(rehearsal.readArchive).toHaveBeenCalledExactlyOnceWith(200);
     expect(rehearsal.activate).not.toHaveBeenCalled();
