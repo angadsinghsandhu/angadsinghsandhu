@@ -13,6 +13,11 @@ import {
 import { physicalLines } from "./output-text.ts";
 import { pdfAssets } from "./pdf-assets.ts";
 import {
+  releaseMarkerFromEnvironment,
+  releaseMarkerPath,
+  verifyReleaseMarker,
+} from "./release-build-marker.ts";
+import {
   notesSnapshotDirectory,
   readProductionNotesSnapshot,
 } from "../src/lib/notes-snapshot.ts";
@@ -203,14 +208,27 @@ function checkGeneratedLines(path: string, bytes: Buffer) {
     throw new Error(`Generated text exceeds 500 physical lines: ${path}`);
 }
 
-async function certify(directory: string) {
+async function certify(directory: string, requireMarker: boolean) {
   const files = readOutput(directory);
+  const markerPath = "/" + releaseMarkerPath;
+  if (requireMarker && !files.has(markerPath))
+    throw new Error(`Missing public file: ${markerPath}`);
+  if (!requireMarker && files.has(markerPath))
+    throw new Error(`Unexpected public file: ${markerPath}`);
   reportOutput(files);
   const parsedOrigin = outputOrigin(process.env.PORTFOLIO_ORIGIN);
   const pages = readPages(directory, files, parsedOrigin);
   const snapshot = await readProductionNotesSnapshot(
     resolve(notesSnapshotDirectory),
   );
+  if (requireMarker) {
+    const marker = releaseMarkerFromEnvironment(process.env);
+    if (marker.notesSha !== snapshot.receipt.sourceSha)
+      throw new Error(
+        "Release marker Notes revision differs from the verified snapshot",
+      );
+    await verifyReleaseMarker(directory, marker);
+  }
   if (snapshot.manifest.verifiedCurriculumIds.length)
     throw new Error("The Pages build does not yet render verified curriculum");
   const expected = releaseInventory(snapshot, parsedOrigin);
@@ -292,6 +310,7 @@ async function certify(directory: string) {
     ...[...expected.metadata.keys()].map((path) => "/" + path),
     ...[...pdf.keys()].map((path) => "/pdfjs/" + path),
   ]);
+  if (requireMarker) required.add(markerPath);
   for (const path of required)
     if (!files.has(path)) throw new Error(`Missing public file: ${path}`);
   const indexed = new Set(snapshot.manifest.entries.map(({ route }) => route));
@@ -339,10 +358,17 @@ async function certify(directory: string) {
 }
 
 try {
-  const [flag, directory, ...extra] = process.argv.slice(2);
-  if (flag !== "--dir" || !directory || extra.length)
-    throw new Error("Usage: npm run verify:output -- --dir dist");
-  await certify(resolve(directory));
+  const [flag, directory, marker, ...extra] = process.argv.slice(2);
+  if (
+    flag !== "--dir" ||
+    !directory ||
+    (marker !== undefined && marker !== "--release-marker") ||
+    extra.length
+  )
+    throw new Error(
+      "Usage: npm run verify:output -- --dir dist [--release-marker]",
+    );
+  await certify(resolve(directory), marker === "--release-marker");
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;

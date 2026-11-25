@@ -103,7 +103,7 @@ jobs:
           npm run import:notes -- --from "$staging/export" --receipt "$staging/receipt.json" --revision "$NOTES_REVISION"
           npm run build:release
           node scripts/release-build-marker.ts
-          npm run verify:output -- --dir dist
+          npm run verify:output -- --dir dist --release-marker
           npm run test:browser
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         id: candidate

@@ -154,7 +154,7 @@ it("adds the release marker before verifying and uploading the candidate", () =>
     "utf8",
   );
   expect(workflow).toMatch(
-    /npm run build:release\n\s+node scripts\/release-build-marker\.ts\n\s+npm run verify:output -- --dir dist[\s\S]*actions\/upload-artifact@/,
+    /npm run build:release\n\s+node scripts\/release-build-marker\.ts\n\s+npm run verify:output -- --dir dist --release-marker[\s\S]*actions\/upload-artifact@/,
   );
   expect(
     workflow.match(

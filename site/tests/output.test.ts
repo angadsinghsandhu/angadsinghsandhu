@@ -12,12 +12,23 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import {
+  encodeReleaseMarker,
+  releaseMarkerPath,
+} from "../scripts/release-build-marker.ts";
+import {
   importNotesSnapshot,
   notesSnapshotDirectory,
 } from "../src/lib/notes-snapshot.ts";
 import fixture from "./fixtures/notes-snapshot/manifest.v1.json" with { type: "json" };
 
 let output: string;
+const candidate = {
+  origin: "https://portfolio.example",
+  portfolioSha: "a".repeat(40),
+  notesSha: fixture.sourceSha,
+  runId: 123,
+  runAttempt: 2,
+};
 
 beforeEach(() => {
   output = mkdtempSync(join(tmpdir(), "portfolio-output-test-"));
@@ -29,14 +40,28 @@ function rejectArtifact(
   message: string,
   cwd?: string,
   nodeOptions: string[] = [],
+  markerNotesSha?: string,
 ) {
   const result = spawnSync(
     process.execPath,
-    [...nodeOptions, resolve("scripts/verify-output.ts"), "--dir", output],
+    [
+      ...nodeOptions,
+      resolve("scripts/verify-output.ts"),
+      "--dir",
+      output,
+      ...(markerNotesSha ? ["--release-marker"] : []),
+    ],
     {
       cwd,
       encoding: "utf8",
-      env: { ...process.env, PORTFOLIO_ORIGIN: "https://portfolio.example" },
+      env: {
+        ...process.env,
+        PORTFOLIO_ORIGIN: candidate.origin,
+        PORTFOLIO_SHA: candidate.portfolioSha,
+        NOTES_REVISION: markerNotesSha,
+        GITHUB_RUN_ID: String(candidate.runId),
+        GITHUB_RUN_ATTEMPT: String(candidate.runAttempt),
+      },
     },
   );
   expect(result.status).toBe(1);
@@ -113,6 +138,43 @@ async function withProductionSnapshot(use: (workspace: string) => void) {
     rmSync(workspace, { recursive: true, force: true });
   }
 }
+
+test("rejects a stray release marker without candidate verification", () => {
+  writeFileSync(
+    join(output, releaseMarkerPath),
+    encodeReleaseMarker(candidate),
+  );
+  rejectArtifact("Unexpected public file: /portfolio-release.json");
+});
+
+test.each(["missing", "mismatched", "wrong Notes revision"] as const)(
+  "rejects a candidate marker with %s",
+  async (problem) => {
+    await withProductionSnapshot((workspace) => {
+      const notesSha =
+        problem === "wrong Notes revision"
+          ? "b".repeat(40)
+          : candidate.notesSha;
+      if (problem !== "missing") {
+        const input =
+          problem === "mismatched"
+            ? { ...candidate, runAttempt: 3 }
+            : { ...candidate, notesSha };
+        writeFileSync(
+          join(output, releaseMarkerPath),
+          encodeReleaseMarker(input),
+        );
+      }
+      const message = {
+        missing: "Missing public file: /portfolio-release.json",
+        mismatched: "Staged release marker differs from the expected bytes",
+        "wrong Notes revision":
+          "Release marker Notes revision differs from the verified snapshot",
+      }[problem];
+      rejectArtifact(message, workspace, [], notesSha);
+    });
+  },
+);
 
 test("rejects a missing local fragment", async () => {
   await withProductionSnapshot((workspace) => {

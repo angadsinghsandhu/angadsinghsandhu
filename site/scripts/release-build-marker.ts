@@ -114,18 +114,23 @@ export async function probeReleaseMarker(
   return "unknown";
 }
 
-if (import.meta.main) {
+export function releaseMarkerFromEnvironment(
+  env: NodeJS.ProcessEnv,
+): ReleaseMarkerIdentity {
   const envId = z
     .string()
     .regex(/^[1-9][0-9]*(?![\s\S])/u)
     .transform(Number)
     .pipe(id);
-  const env = process.env;
-  await writeReleaseMarker("dist", {
+  return {
     origin: env.PORTFOLIO_ORIGIN ?? "",
     portfolioSha: env.PORTFOLIO_SHA ?? "",
     notesSha: env.NOTES_REVISION ?? "",
     runId: envId.parse(env.GITHUB_RUN_ID),
     runAttempt: envId.parse(env.GITHUB_RUN_ATTEMPT),
-  });
+  };
+}
+
+if (import.meta.main) {
+  await writeReleaseMarker("dist", releaseMarkerFromEnvironment(process.env));
 }
