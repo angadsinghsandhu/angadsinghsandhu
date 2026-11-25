@@ -18,16 +18,29 @@ const script = fileURLToPath(
 );
 const generated = fileURLToPath(new URL("../../.generated/", import.meta.url));
 const fixture = String.raw`
-import json, struct, sys, warnings, zipfile
+import io, json, struct, sys, warnings, zipfile, zlib
 archive, damage = sys.argv[1:]
 warnings.filterwarnings("ignore", message="Duplicate name:")
-with zipfile.ZipFile(archive, "w") as output:
+if damage == "zip64":
+    zipfile.ZIP64_LIMIT = 1
+class Nonseekable(io.BytesIO):
+    def seek(self, *args):
+        raise io.UnsupportedOperation("seek")
+buffer = Nonseekable() if damage == "descriptor" else None
+with zipfile.ZipFile(buffer if buffer is not None else archive, "w") as output:
     for name, mode in json.load(sys.stdin):
         member = zipfile.ZipInfo(name)
         member.external_attr = mode << 16
+        if damage == "large-directory":
+            member.comment = b"x" * 65535
         data = b"" if name.endswith("/") else bytes([0, 10, 255])
+        if buffer is not None:
+            data *= 700000
         output.writestr(member, data, zipfile.ZIP_DEFLATED if name == "_redirects" else zipfile.ZIP_STORED)
-if damage:
+if buffer is not None:
+    with open(archive, "wb") as output:
+        output.write(buffer.getvalue())
+if damage and damage not in ("large-directory", "zip64", "descriptor"):
     with open(archive, "r+b") as output:
         data = bytearray(output.read())
         if damage == "late-crc":
@@ -39,6 +52,20 @@ if damage:
         elif damage == "short-member":
             central = data.index(b"PK\x01\x02")
             struct.pack_into("<I", data, central + 24, 4)
+        elif damage == "understated":
+            central = data.index(b"PK\x01\x02")
+            struct.pack_into("<I", data, 14, zlib.crc32(b"\x00"))
+            struct.pack_into("<I", data, 22, 1)
+            struct.pack_into("<I", data, central + 16, zlib.crc32(b"\x00"))
+            struct.pack_into("<I", data, central + 24, 1)
+        elif damage == "short-deflate":
+            central = data.index(b"PK\x01\x02")
+            size = struct.unpack_from("<I", data, central + 20)[0] - 1
+            struct.pack_into("<I", data, 18, size)
+            struct.pack_into("<I", data, central + 20, size)
+        elif damage == "understated-count":
+            end = data.rindex(b"PK\x05\x06")
+            struct.pack_into("<HH", data, end + 8, 1, 1)
         elif damage == "nul":
             data = data.replace(b"nul_file", b"nul\x00file")
         else:
@@ -197,6 +224,56 @@ describe("checked release archive staging", () => {
   it("rejects fewer extracted bytes than the central directory declares", () => {
     zip(["ok"], "short-member");
     rejectArchive(/incomplete ZIP member/);
+  });
+
+  it.each(["stored", "_redirects"])(
+    "rejects an understated %s member even with a matching prefix CRC",
+    (name) => {
+      zip([name], "understated");
+      rejectArchive(/incomplete ZIP member/);
+    },
+  );
+
+  it("requires a complete DEFLATE stream even when all declared bytes are present", () => {
+    zip(["_redirects"], "short-deflate");
+    rejectArchive(/incomplete ZIP member/);
+  });
+
+  it("rejects an oversized central directory before staging", () => {
+    zip(
+      Array.from({ length: 257 }, (_, n) => `entry-${n}`),
+      "large-directory",
+    );
+    rejectArchive(/central directory exceeds its size limit/);
+  });
+
+  it("bounds actual central records even if the trailer understates its count", () => {
+    zip(
+      Array.from({ length: 40_001 }, (_, n) => `dir-${n}/`),
+      "understated-count",
+    );
+    rejectArchive(/central directory exceeds its entry count limit/);
+  });
+
+  it("stages a single-disk Zip64 export", () => {
+    zip(["_redirects", "nested/asset"], "zip64");
+    const result = stage();
+    expect(result.stderr).toBe("");
+    expect(result.status).toBe(0);
+    expect(readFileSync(join(output, "nested/asset"))).toEqual(
+      Buffer.from([0, 10, 255]),
+    );
+  });
+
+  it("drains a multi-chunk DEFLATE member with a streaming data descriptor", () => {
+    zip(["_redirects"], "descriptor");
+    const result = stage();
+    expect(result.stderr).toBe("");
+    expect(result.status).toBe(0);
+    const expected = Buffer.alloc(2_100_000, Buffer.from([0, 10, 255]));
+    expect(readFileSync(join(output, "_redirects")).equals(expected)).toBe(
+      true,
+    );
   });
 
   it("rejects a truncated ZIP without publishing output", () => {

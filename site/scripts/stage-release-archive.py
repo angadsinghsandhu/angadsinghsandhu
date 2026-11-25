@@ -5,6 +5,7 @@ import ntpath
 import os
 from pathlib import Path
 import stat
+import struct
 import sys
 import tempfile
 import unicodedata
@@ -17,6 +18,48 @@ MAX_PATH_DEPTH = 64
 MAX_FILE_BYTES = 25 * 1024**2
 MAX_EXPANDED_BYTES = 5 * 1024**3 // 4
 CHUNK_BYTES = 1024**2
+MAX_CENTRAL_BYTES = 16 * 1024**2
+CENTRAL_FIELDS = struct.Struct("<4s24x3H")
+LOCAL_LENGTHS = struct.Struct("<2H")
+
+
+def check_central_directory(stream):
+    # Use the same classic/Zip64 trailer reader as ZipFile so the bounds cover
+    # the exact directory that its eager parser will load.
+    trailer = zipfile._EndRecData(stream)
+    if trailer is None:
+        raise zipfile.BadZipFile("File is not a zip file")
+    size = trailer[zipfile._ECD_SIZE]
+    if size > MAX_CENTRAL_BYTES:
+        raise ValueError("ZIP central directory exceeds its size limit")
+    start = trailer[zipfile._ECD_LOCATION] - size
+    if trailer[zipfile._ECD_SIGNATURE] == zipfile.stringEndArchive64:
+        start -= zipfile.sizeEndCentDir64 + zipfile.sizeEndCentDir64Locator
+    if (
+        start < 0
+        or start != trailer[zipfile._ECD_OFFSET]
+        or trailer[zipfile._ECD_DISK_NUMBER]
+        or trailer[zipfile._ECD_DISK_START]
+    ):
+        raise zipfile.BadZipFile("Invalid ZIP central directory location")
+    stream.seek(start)
+    data = stream.read(size)
+    position = count = 0
+    while position + zipfile.sizeCentralDir <= len(data):
+        signature, filename, extra, comment = CENTRAL_FIELDS.unpack_from(data, position)
+        if signature != zipfile.stringCentralDir:
+            raise zipfile.BadZipFile("Invalid ZIP central directory entry")
+        position += zipfile.sizeCentralDir + filename + extra + comment
+        count += 1
+        if count > MAX_PATHS:
+            raise ValueError("ZIP central directory exceeds its entry count limit")
+    if (
+        position != size
+        or len(data) != size
+        or count != trailer[zipfile._ECD_ENTRIES_TOTAL]
+        or count != trailer[zipfile._ECD_ENTRIES_THIS_DISK]
+    ):
+        raise zipfile.BadZipFile("Invalid ZIP central directory size or count")
 
 
 def checked_members(archive):
@@ -75,34 +118,70 @@ def checked_members(archive):
     return members, directories
 
 
+def member_chunks(stream, archive, member):
+    # ZipFile validates the local name and header. Its stream clips output to
+    # the advertised size, so use the compressed span to verify real EOF.
+    archive.open(member).close()
+    stream.seek(member.header_offset + 26)
+    name_bytes, extra_bytes = LOCAL_LENGTHS.unpack(stream.read(LOCAL_LENGTHS.size))
+    stream.seek(name_bytes + extra_bytes, os.SEEK_CUR)
+    decoder = (
+        zlib.decompressobj(-zlib.MAX_WBITS)
+        if member.compress_type == zipfile.ZIP_DEFLATED
+        else None
+    )
+    remaining = member.compress_size
+    written = crc = 0
+    while remaining:
+        block = stream.read(min(remaining, CHUNK_BYTES))
+        if not block:
+            raise zipfile.BadZipFile(f"incomplete ZIP member: {member.filename!r}")
+        remaining -= len(block)
+        while block:
+            if decoder is None:
+                chunk, block = block, b""
+            else:
+                chunk = decoder.decompress(block, CHUNK_BYTES)
+                block = decoder.unconsumed_tail
+                if decoder.unused_data or (decoder.eof and remaining):
+                    raise zipfile.BadZipFile(f"invalid DEFLATE span: {member.filename!r}")
+            written += len(chunk)
+            if written > member.file_size:
+                raise zipfile.BadZipFile(f"incomplete ZIP member: {member.filename!r}")
+            crc = zlib.crc32(chunk, crc)
+            if chunk:
+                yield chunk
+    if written != member.file_size or (decoder is not None and not decoder.eof):
+        raise zipfile.BadZipFile(f"incomplete ZIP member: {member.filename!r}")
+    if crc != member.CRC:
+        raise zipfile.BadZipFile(f"Bad CRC for ZIP member: {member.filename!r}")
+
+
 def stage_release_archive(archive_path, destination):
     if os.path.lexists(destination):
         raise ValueError("destination already exists")
-    with zipfile.ZipFile(archive_path) as archive:
-        members, directories = checked_members(archive)
-        # Use a private sibling so promotion is atomic on the destination filesystem.
-        with tempfile.TemporaryDirectory(
-            prefix=".release-archive-", dir=destination.parent
-        ) as work_directory:
-            staged = Path(work_directory) / "staged"
-            staged.mkdir(mode=0o700)
-            for parts in directories:
-                staged.joinpath(*parts).mkdir()
-            for member, parts in members:
-                path = staged.joinpath(*parts)
-                with archive.open(member) as source:
+    with archive_path.open("rb") as stream:
+        check_central_directory(stream)
+        with zipfile.ZipFile(stream) as archive:
+            members, directories = checked_members(archive)
+            # Use a private sibling so promotion is atomic on the destination filesystem.
+            with tempfile.TemporaryDirectory(
+                prefix=".release-archive-", dir=destination.parent
+            ) as work_directory:
+                staged = Path(work_directory) / "staged"
+                staged.mkdir(mode=0o700)
+                for parts in directories:
+                    staged.joinpath(*parts).mkdir()
+                for member, parts in members:
+                    chunks = member_chunks(stream, archive, member)
                     if member.is_dir():
-                        source.read(1)
+                        next(chunks, None)
                         continue
-                    written = 0
-                    with path.open("xb") as output:
-                        while chunk := source.read(CHUNK_BYTES):
-                            written += output.write(chunk)
-                    if written != member.file_size:
-                        raise ValueError(f"incomplete ZIP member: {member.filename!r}")
-            if os.path.lexists(destination):
-                raise ValueError("destination already exists")
-            staged.rename(destination)
+                    with staged.joinpath(*parts).open("xb") as output:
+                        output.writelines(chunks)
+                if os.path.lexists(destination):
+                    raise ValueError("destination already exists")
+                staged.rename(destination)
 
 
 def main():
