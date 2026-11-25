@@ -98,7 +98,7 @@ describe("Pages provider", () => {
     const pages = createReleasePages({ ...target, fetch: fetchFixture });
     expect(await pages.observe(request)).toEqual(confirmed);
     expect(fetchFixture).toHaveBeenCalledExactlyOnceWith(
-      new URL(deploymentPath + "?env=production&page=1&per_page=20"),
+      new URL(deploymentPath + "?page=1&per_page=20"),
       expect.objectContaining({
         method: "GET",
         redirect: "error",
@@ -351,8 +351,75 @@ it("checks all Pages results before claiming exact identity", async () => {
   expect(await pages.observe(request)).toEqual(unknown);
   expect(await pages.observe(request)).toEqual(confirmed);
   expect(String(fetchFixture.mock.calls[1][0])).toBe(
-    deploymentPath + "?env=production&page=2&per_page=20",
+    deploymentPath + "?page=2&per_page=20",
   );
+});
+
+it("requires consistent provider evidence to classify a skipped deployment as terminal", async () => {
+  const stage = {
+    name: "deploy",
+    status: "skipped",
+    ended_on: "2026-11-24T00:00:00Z",
+  };
+  const fetchFixture = vi
+    .fn<typeof fetch>()
+    .mockResolvedValueOnce(page([deployment({ latest_stage: stage })]))
+    .mockResolvedValueOnce(
+      page([deployment({ latest_stage: stage, is_skipped: true })]),
+    );
+  const pages = createReleasePages({ ...target, fetch: fetchFixture });
+  expect(await pages.observe(request)).toEqual(unknown);
+  expect(await pages.observe(request)).toEqual({ status: "failed" });
+});
+
+it("treats a malformed sibling with the same operation UUID as ambiguous", async () => {
+  const malformedSibling = deployment({
+    id: projectId,
+    deployment_trigger: {
+      ...deployment().deployment_trigger,
+      metadata: {
+        ...deployment().deployment_trigger.metadata,
+        commit_message: `portfolio:v1:${request.operationKey}:truncated-digest`,
+      },
+    },
+  });
+  const fetchFixture = vi
+    .fn<typeof fetch>()
+    .mockResolvedValueOnce(page([deployment(), malformedSibling]))
+    .mockResolvedValueOnce(page([malformedSibling, deployment()]));
+  const pages = createReleasePages({ ...target, fetch: fetchFixture });
+  expect(await pages.observe(request)).toEqual(unknown);
+  expect(await pages.observe(request)).toEqual(unknown);
+});
+
+it("scans mixed deployment history against the unfiltered total count", async () => {
+  const preview = Array.from({ length: 20 }, (_, index) =>
+    deployment({
+      id: `12345678-1234-4567-8910-${String(index + 10).padStart(12, "0")}`,
+      environment: "preview",
+      deployment_trigger: {
+        ...deployment().deployment_trigger,
+        metadata: {
+          ...deployment().deployment_trigger.metadata,
+          branch: "feature",
+          commit_message: "Unrelated preview",
+        },
+      },
+    }),
+  );
+  const fetchFixture = vi
+    .fn<typeof fetch>()
+    .mockResolvedValueOnce(page(preview, 1, 21))
+    .mockResolvedValueOnce(page([deployment()], 2, 21))
+    .mockResolvedValueOnce(page([deployment(), ...preview.slice(1)], 1, 2001));
+  const pages = createReleasePages({ ...target, fetch: fetchFixture });
+  expect(await pages.observe(request)).toEqual(confirmed);
+  expect(fetchFixture.mock.calls.map(([url]) => String(url))).toEqual([
+    deploymentPath + "?page=1&per_page=20",
+    deploymentPath + "?page=2&per_page=20",
+  ]);
+  expect(await pages.observe(request)).toEqual(unknown);
+  expect(fetchFixture).toHaveBeenCalledTimes(3);
 });
 
 it("reports an exact terminal failure while leaving an absent deployment unknown", async () => {

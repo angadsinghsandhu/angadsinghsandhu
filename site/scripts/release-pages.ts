@@ -210,18 +210,12 @@ async function checkStage({ directory, executable }: Stage): Promise<void> {
 
 function outcome(candidate: Deployment): Observation {
   const { latest_stage: stage } = candidate;
-  if (
-    stage.ended_on &&
-    ["failure", "canceled", "skipped"].includes(stage.status)
-  ) {
+  if (!stage.ended_on || candidate.is_skipped !== (stage.status === "skipped"))
+    return unknown;
+  if (["failure", "canceled", "skipped"].includes(stage.status)) {
     return { status: "failed" };
   }
-  if (
-    !candidate.is_skipped &&
-    stage.name === "deploy" &&
-    stage.status === "success" &&
-    stage.ended_on
-  ) {
+  if (stage.name === "deploy" && stage.status === "success") {
     return { status: "confirmed", deploymentId: candidate.id };
   }
   return unknown;
@@ -375,13 +369,15 @@ export function createReleasePages(
       const receipt = receiptSchema.safeParse(inputReceipt).data;
       if (!receipt || !uuid.safeParse(operationKey).success) return unknown;
       const digest = receiptDigest(receipt);
+      const operationMarker = `portfolio:v1:${operationKey}`;
       const signal = AbortSignal.timeout(timeout);
       const seen = new Set<string>();
       let total: number | undefined;
       let candidate: Deployment | undefined;
       for (let page = 1; page <= maxPages; page++) {
         const url = new URL(deploymentsUrl);
-        url.search = `env=production&page=${page}&per_page=${pageSize}`;
+        // Cloudflare reports total_count across all environments.
+        url.search = `page=${page}&per_page=${pageSize}`;
         const response = await request(url, "GET", signal);
         const info = pagination.safeParse(response?.result_info).data;
         const rows = deploymentPage.safeParse(response?.result).data;
@@ -403,19 +399,11 @@ export function createReleasePages(
         )
           return unknown;
         for (const row of rows) {
-          if (
-            seen.has(row.id) ||
-            row.project_name !== projectName ||
-            row.environment !== "production"
-          )
+          if (seen.has(row.id) || row.project_name !== projectName)
             return unknown;
           seen.add(row.id);
-          if (
-            metadataPattern.exec(
-              row.deployment_trigger.metadata.commit_message,
-            )?.[1] !== operationKey
-          )
-            continue;
+          const message = row.deployment_trigger.metadata.commit_message;
+          if (!message.startsWith(operationMarker)) continue;
           if (candidate || !matches(row, receipt, digest)) return unknown;
           candidate = row;
         }
