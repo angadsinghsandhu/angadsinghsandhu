@@ -69,6 +69,16 @@ const deployment = z.object({
     ended_on: z.iso.datetime({ offset: true }).nullable(),
   }),
 });
+const servingProject = project.extend({
+  id: uuid,
+  domains: z.array(z.string()).optional(),
+  subdomain: z.string().optional(),
+  uses_functions: z.literal(false),
+  canonical_deployment: deployment.extend({
+    project_id: uuid,
+    uses_functions: z.literal(false),
+  }),
+});
 const deploymentPage = z.array(deployment).max(pageSize);
 const pagination = z.object({
   page: z.number().int().positive(),
@@ -291,11 +301,37 @@ export function createReleasePages(
     return candidate;
   }
 
+  async function readServingDeploymentId(): Promise<string | undefined> {
+    const current = servingProject.safeParse(
+      (await request(new URL(projectUrl)))?.result,
+    ).data;
+    const host = new URL(origin).host;
+    if (
+      current?.name !== projectName ||
+      current.production_branch !== productionBranch ||
+      (current.subdomain !== host && !current.domains?.includes(host))
+    )
+      return undefined;
+    const candidate = current.canonical_deployment;
+    if (
+      candidate.project_id === current.id &&
+      candidate.project_name === projectName &&
+      candidate.environment === "production" &&
+      candidate.deployment_trigger.metadata.branch === productionBranch &&
+      outcome(candidate).status === "confirmed"
+    )
+      return candidate.id;
+    return undefined;
+  }
+
   return {
+    readServingDeploymentId,
+
     async deploy(
       { operationKey, receipt: inputReceipt }: DeployRequest,
       stage: Stage,
-    ): Promise<{ status: "submitted" | "unknown" }> {
+      beforeUpload?: () => Promise<boolean>,
+    ): Promise<{ status: "submitted" | "unknown" | "rejected" }> {
       const receipt = receiptSchema.safeParse(inputReceipt).data;
       if (!receipt || !uuid.safeParse(operationKey).success) return unknown;
       const { directory, executable } = stage;
@@ -318,6 +354,8 @@ export function createReleasePages(
           return unknown;
         const cwd = await mkdtemp(join(dirname(directory), ".pages-release-"));
         try {
+          if (beforeUpload && !(await beforeUpload()))
+            return { status: "rejected" };
           const submitted = await execute(
             executable,
             [
@@ -426,11 +464,22 @@ export function createReleasePages(
     async rollback(
       { receipt: inputReceipt }: ReceiptRequest,
       deploymentId: string,
+      expectedServingId?: string,
     ): Promise<Observation> {
       const receipt = receiptSchema.safeParse(inputReceipt).data;
       if (!receipt || !uuid.safeParse(deploymentId).success) return unknown;
+      if (
+        expectedServingId !== undefined &&
+        !uuid.safeParse(expectedServingId).success
+      )
+        return unknown;
       const prior = await readExact(receipt, deploymentId, "GET");
       if (!prior || outcome(prior).status !== "confirmed") return unknown;
+      if (
+        expectedServingId !== undefined &&
+        (await readServingDeploymentId()) !== expectedServingId
+      )
+        return unknown;
       const restored = await readExact(receipt, deploymentId, "POST");
       if (
         !restored ||

@@ -486,3 +486,155 @@ process.exit(Number(!(
     await rm(root, { recursive: true, force: true });
   }
 });
+
+const projectPath = deploymentPath.replace(/\/deployments$/u, "");
+
+function approvedProject(changes: Record<string, unknown> = {}) {
+  return {
+    id: projectId,
+    name: target.projectName,
+    production_branch: target.productionBranch,
+    subdomain: "portfolio.pages.dev",
+    domains: ["portfolio.example"],
+    uses_functions: false,
+    canonical_deployment: deployment({ uses_functions: false }),
+    ...changes,
+  };
+}
+
+it.each([target.origin, "https://portfolio.pages.dev"])(
+  "reads the successful canonical Pages deployment for %s",
+  async (origin) => {
+    const fetchFixture = vi.fn<typeof fetch>(async () =>
+      envelope(approvedProject()),
+    );
+    const pages = createReleasePages({
+      ...target,
+      origin,
+      fetch: fetchFixture,
+    });
+    await expect(pages.readServingDeploymentId()).resolves.toBe(deploymentId);
+    expect(fetchFixture).toHaveBeenCalledExactlyOnceWith(
+      new URL(projectPath),
+      expect.objectContaining({ method: "GET", redirect: "error" }),
+    );
+  },
+);
+
+it.each([
+  { name: "other" },
+  { production_branch: "next" },
+  { domains: ["sub.portfolio.example"], subdomain: "other.pages.dev" },
+  { uses_functions: true },
+  { uses_functions: undefined },
+  { canonical_deployment: null },
+  { canonical_deployment: deployment({ uses_functions: true }) },
+  { canonical_deployment: deployment() },
+  {
+    canonical_deployment: deployment({
+      uses_functions: false,
+      environment: "preview",
+    }),
+  },
+  {
+    canonical_deployment: deployment({
+      uses_functions: false,
+      deployment_trigger: {
+        ...deployment().deployment_trigger,
+        metadata: {
+          ...deployment().deployment_trigger.metadata,
+          branch: "next",
+        },
+      },
+    }),
+  },
+  {
+    canonical_deployment: deployment({
+      uses_functions: false,
+      project_id: "12345678-1234-4567-8910-000000000003",
+    }),
+  },
+  {
+    canonical_deployment: deployment({
+      uses_functions: false,
+      latest_stage: { name: "deploy", status: "active", ended_on: null },
+    }),
+  },
+])("leaves serving state unknown on project drift %j", async (changes) => {
+  const pages = createReleasePages({
+    ...target,
+    fetch: async () => envelope(approvedProject(changes)),
+  });
+  await expect(pages.readServingDeploymentId()).resolves.toBeUndefined();
+});
+
+it("reads the serving ID after loading the retained target and before POST", async () => {
+  const expectedServingId = "12345678-1234-4567-8910-000000000003";
+  const fetchFixture = vi
+    .fn<typeof fetch>()
+    .mockResolvedValueOnce(envelope(deployment()))
+    .mockResolvedValueOnce(envelope(approvedProject()))
+    .mockResolvedValueOnce(envelope(deployment()))
+    .mockResolvedValueOnce(
+      envelope(
+        approvedProject({
+          canonical_deployment: deployment({
+            id: expectedServingId,
+            uses_functions: false,
+          }),
+        }),
+      ),
+    )
+    .mockResolvedValueOnce(envelope(deployment()));
+  const pages = createReleasePages({ ...target, fetch: fetchFixture });
+  await expect(
+    pages.rollback(request, deploymentId, expectedServingId),
+  ).resolves.toEqual(unknown);
+  await expect(
+    pages.rollback(request, deploymentId, expectedServingId),
+  ).resolves.toEqual(confirmed);
+  expect(
+    fetchFixture.mock.calls.map(([url, init]) => [String(url), init?.method]),
+  ).toEqual([
+    [`${deploymentPath}/${deploymentId}`, "GET"],
+    [projectPath, "GET"],
+    [`${deploymentPath}/${deploymentId}`, "GET"],
+    [projectPath, "GET"],
+    [`${deploymentPath}/${deploymentId}/rollback`, "POST"],
+  ]);
+});
+
+it("does not upload when the final source recheck rejects the release", async () => {
+  const directory = await mkdtemp(
+    join(await realpath(tmpdir()), "pages-assets-"),
+  );
+  try {
+    await writeReleaseMarker(directory, marker);
+    const fetchFixture = vi.fn<typeof fetch>(async () =>
+      envelope(approvedProject()),
+    );
+    const execute = vi.fn(async () => true);
+    const pages = createReleasePages({
+      ...target,
+      fetch: fetchFixture,
+      execute,
+    });
+    const beforeUpload = vi.fn(async () => {
+      expect(fetchFixture).toHaveBeenCalledOnce();
+      return false;
+    });
+    await expect(
+      pages.deploy(
+        request,
+        { directory, executable: process.execPath },
+        beforeUpload,
+      ),
+    ).resolves.toEqual({
+      status: "rejected",
+    });
+    expect(beforeUpload).toHaveBeenCalledOnce();
+    expect(execute).not.toHaveBeenCalled();
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
