@@ -35,11 +35,17 @@ The required `Verify portfolio` job runs for opened, reopened and updated pull r
 
 A dispatch carries `repository`, `ref`, `sha` and numeric `runId` in `client_payload`. Source selection verifies GitHub's sender and target repository, checks that the workflow SHA is the current protected Portfolio `main` commit, and checks Notes workflow `379127533` and its required `verify` job for the same protected Notes commit. A Portfolio push discovers the eligible Notes run for the current approved Notes head. A dispatch supplies the run to check. The chooser records both source SHAs and the Notes run ID and attempt.
 
-The build uses clean, SHA-pinned checkouts. After standalone verification, it exports Notes into runner temporary storage, imports the export and receipt, builds with the approved origin, certifies the output, and runs the Chromium archive suite. The upload retains only `site/dist` as `portfolio-candidate-<run ID>-<attempt>`. The candidate workflow has no deployment job or hosting credentials.
+The build uses clean, SHA-pinned checkouts. After standalone verification, it exports Notes into runner temporary storage, imports the export and receipt, builds with the approved origin, writes the [release marker](#hosted-release-identity), certifies the output, and runs the Chromium archive suite. The upload retains only `site/dist` as `portfolio-candidate-<run ID>-<attempt>`. The candidate workflow has no deployment job or hosting credentials.
 
 After upload, the build job rereads the validated production snapshot and checks GitHub artifact metadata with the job’s read-only Actions token. The check binds the artifact ID, archive SHA-256, repository, Portfolio revision and exact run-attempt name, and requires a current expiration. On success, the job exposes its separate JSON `release_receipt` output with the Portfolio and Notes SHAs, snapshot schema and manifest digest, run ID and attempt, artifact ID, and archive SHA-256. A failed check leaves the job without a receipt. The receipt stays outside the archive.
 
 Production publication requires an authorized Notes sender workflow and a publication gate connected to approved hosting and durable release state.
+
+### Hosted release identity
+
+The candidate job writes the public `/portfolio-release.json` into the freshly built `dist/` before output verification. Version 1 binds the canonical HTTPS origin, Portfolio and Notes SHAs, and the candidate build's Actions run ID and attempt in fixed JSON bytes. An existing file at the reserved path fails the build. Standalone and rehearsal builds omit the marker.
+
+Before activation, verify the staged marker byte for byte using the selected receipt's source SHAs, build run ID and attempt, and the approved origin. For host confirmation, the probe makes a fresh credential-free GET to that origin with redirects disabled, a ten-second deadline, and a response size bounded by the expected marker bytes. Compare the response with the exact selected and prior markers to distinguish a selected release, a prior release, and an unknown host state. The marker identifies what the host is serving. Provider deployment confirmation and canonical hostname, alias and cache behavior still require cutover verification. Run the [offline marker fixtures](../site/tests/scripts/release-build-marker.test.ts) from `site` with `npx vitest run tests/scripts/release-build-marker.test.ts`.
 
 ## Credential-free publication rehearsal
 
