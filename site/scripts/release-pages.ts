@@ -41,7 +41,12 @@ const providerResponse = z.object({
   result: z.unknown(),
   result_info: z.unknown().optional(),
 });
-const project = z.object({ name: z.string(), production_branch: z.string() });
+const project = z.object({
+  name: z.string(),
+  production_branch: z.string(),
+  domains: z.array(z.string()).optional(),
+  subdomain: z.string().optional(),
+});
 const deployment = z.object({
   id: uuid,
   project_name: z.string(),
@@ -71,8 +76,6 @@ const deployment = z.object({
 });
 const servingProject = project.extend({
   id: uuid,
-  domains: z.array(z.string()).optional(),
-  subdomain: z.string().optional(),
   uses_functions: z.literal(false),
   canonical_deployment: deployment.extend({
     project_id: uuid,
@@ -241,6 +244,7 @@ export function createReleasePages(
   if (!parsed.success) throw new Error("Pages configuration is invalid");
   const { accountId, projectName, productionBranch, token } = parsed.data;
   const origin = outputOrigin(parsed.data.origin);
+  const host = new URL(origin).host;
   const { fetch: fetchPages = fetch, execute = runWrangler } = input;
   const projectUrl = `${api}/accounts/${accountId}/pages/projects/${projectName}`;
   const deploymentsUrl = `${projectUrl}/deployments`;
@@ -301,17 +305,19 @@ export function createReleasePages(
     return candidate;
   }
 
+  function matchesProject(current: z.output<typeof project>): boolean {
+    return (
+      current.name === projectName &&
+      current.production_branch === productionBranch &&
+      (current.subdomain === host || current.domains?.includes(host) === true)
+    );
+  }
+
   async function readServingDeploymentId(): Promise<string | undefined> {
     const current = servingProject.safeParse(
       (await request(new URL(projectUrl)))?.result,
     ).data;
-    const host = new URL(origin).host;
-    if (
-      current?.name !== projectName ||
-      current.production_branch !== productionBranch ||
-      (current.subdomain !== host && !current.domains?.includes(host))
-    )
-      return undefined;
+    if (!current || !matchesProject(current)) return undefined;
     const candidate = current.canonical_deployment;
     if (
       candidate.project_id === current.id &&
@@ -347,11 +353,7 @@ export function createReleasePages(
         const current = project.safeParse(
           (await request(new URL(projectUrl)))?.result,
         ).data;
-        if (
-          current?.name !== projectName ||
-          current.production_branch !== productionBranch
-        )
-          return unknown;
+        if (!current || !matchesProject(current)) return unknown;
         const cwd = await mkdtemp(join(dirname(directory), ".pages-release-"));
         try {
           if (beforeUpload && !(await beforeUpload()))

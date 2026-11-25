@@ -205,10 +205,7 @@ describe("Pages provider", () => {
     try {
       await writeReleaseMarker(directory, marker);
       const fetchFixture = vi.fn<typeof fetch>(async () =>
-        envelope({
-          name: target.projectName,
-          production_branch: target.productionBranch,
-        }),
+        envelope(approvedProject()),
       );
       const execute: NonNullable<
         Parameters<typeof createReleasePages>[0]["execute"]
@@ -287,14 +284,10 @@ describe("Pages provider", () => {
       const fetchFixture = vi
         .fn<typeof fetch>()
         .mockResolvedValueOnce(
-          envelope({ name: target.projectName, production_branch: "wrong" }),
+          envelope(approvedProject({ production_branch: "wrong" })),
         )
-        .mockResolvedValueOnce(
-          envelope({ name: target.projectName, production_branch: "main" }),
-        )
-        .mockResolvedValueOnce(
-          envelope({ name: target.projectName, production_branch: "main" }),
-        );
+        .mockResolvedValueOnce(envelope(approvedProject()))
+        .mockResolvedValueOnce(envelope(approvedProject()));
       const execute = vi
         .fn<NonNullable<Parameters<typeof createReleasePages>[0]["execute"]>>()
         .mockRejectedValueOnce(new Error("sensitive"))
@@ -449,10 +442,7 @@ it("executes a local stand-in directly from an isolated directory", async () => 
     await writeReleaseMarker(directory, marker);
     const executable = join(root, "fake-wrangler");
     const fetchFixture = vi.fn<typeof fetch>(async () =>
-      envelope({
-        name: target.projectName,
-        production_branch: target.productionBranch,
-      }),
+      envelope(approvedProject()),
     );
     const pages = createReleasePages({ ...target, fetch: fetchFixture });
     await writeFile(
@@ -638,3 +628,58 @@ it("does not upload when the final source recheck rejects the release", async ()
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+it.each([
+  [
+    "mismatched hosts",
+    { domains: ["other.example"], subdomain: "other.pages.dev" },
+    "unknown",
+    target.origin,
+  ],
+  [
+    "missing hosts",
+    { domains: undefined, subdomain: undefined },
+    "unknown",
+    target.origin,
+  ],
+  [
+    "approved custom domain",
+    { canonical_deployment: null },
+    "submitted",
+    target.origin,
+  ],
+  [
+    "approved Pages subdomain",
+    { domains: undefined, canonical_deployment: undefined },
+    "submitted",
+    "https://portfolio.pages.dev",
+  ],
+] as const)(
+  "checks the project hostname before upload for %s",
+  async (_label, changes, status, origin) => {
+    const directory = await mkdtemp(
+      join(await realpath(tmpdir()), "pages-assets-"),
+    );
+    try {
+      await writeReleaseMarker(directory, { ...marker, origin });
+      const execute = vi.fn(async () => true);
+      const beforeUpload = vi.fn(async () => true);
+      const pages = createReleasePages({
+        ...target,
+        origin,
+        fetch: async () => envelope(approvedProject(changes)),
+        execute,
+      });
+      const stage = { directory, executable: process.execPath };
+      await expect(pages.deploy(request, stage, beforeUpload)).resolves.toEqual(
+        { status },
+      );
+      expect(beforeUpload).toHaveBeenCalledTimes(
+        status === "submitted" ? 1 : 0,
+      );
+      expect(execute).toHaveBeenCalledTimes(status === "submitted" ? 1 : 0);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+);
