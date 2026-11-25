@@ -55,6 +55,12 @@ Rollback requires explicit authorization for the exact retained known-good recei
 
 The rehearsal uses unexpired GitHub artifacts for rollback verification. If the approved rollback window exceeds CI artifact expiry, the production adapter needs retained archives or restorable deployments with trustworthy stored identity and digest evidence. Production releases and rollbacks must share the same serialization gate. The activation adapter must keep the deployment and durable active receipt consistent across failures and retries.
 
+### Production state inputs
+
+Workflow outputs carry the receipt for the current run. GitHub artifact metadata identifies the Portfolio run and archive. For `readVerified`, persist the verified release receipt and the successful candidate build proof together in trusted durable storage after the checks and receipt binding pass. Include the exact Notes verification repository, ref, workflow ID, run ID and attempt, and the required job's success for the receipt's Notes SHA. The stored proof binds that SHA and the snapshot manifest digest to the checked candidate.
+
+Keep a separate durable history of confirmed known-good deployments with their exact receipts. For `readAuthorizedRollback`, look up the requested receipt in that history and require explicit rollback approval bound to the selected retained record. Return the stored receipt only when both the record and that approval match.
+
 ## Release checks
 
 - Investigate every missing or extra route, fragment or search result. Fix the source or adjust the reviewed inventory before rebuilding. The Pages ceiling is 20,000 files and 25 MiB per file. Generated text is capped at 500 physical lines. Sitemap shards preserve all canonical URLs within that cap.
