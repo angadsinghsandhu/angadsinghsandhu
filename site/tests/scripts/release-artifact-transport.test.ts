@@ -1,5 +1,12 @@
+import { createHash } from "node:crypto";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { expect, it, vi } from "vitest";
-import { createGitHubArchiveReader } from "../../scripts/release-artifact-transport.ts";
+import {
+  createGitHubArchiveReader,
+  downloadReleaseArtifactArchive,
+} from "../../scripts/release-artifact-transport.ts";
 
 const token = "fixture-token";
 const signedUrl =
@@ -235,4 +242,129 @@ it("applies separate deadlines to the GitHub request and the storage body", asyn
   } finally {
     deadlines.mockRestore();
   }
+});
+
+const zipBytes = Uint8Array.of(80, 75, 1, 2);
+const receipt = {
+  portfolioSha: "a".repeat(40),
+  runId: 11,
+  runAttempt: 2,
+  artifactId: 17,
+  archiveSha256: createHash("sha256").update(zipBytes).digest("hex"),
+};
+
+function metadata(name = "portfolio-candidate-11-2") {
+  return Response.json({
+    id: receipt.artifactId,
+    name,
+    expired: false,
+    expires_at: new Date(Date.now() + 60_000).toISOString(),
+    digest: "sha256:" + receipt.archiveSha256,
+    workflow_run: {
+      id: receipt.runId,
+      repository_id: 339077137,
+      head_repository_id: 339077137,
+      head_branch: "main",
+      head_sha: receipt.portfolioSha,
+    },
+  });
+}
+
+async function withArchivePath(run: (path: string) => Promise<void>) {
+  const dir = await mkdtemp(join(tmpdir(), "release-artifact-"));
+  try {
+    await run(join(dir, "candidate.zip"));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+it("rechecks metadata and writes exactly the verified chunks to a private file", async () => {
+  await withArchivePath(async (path) => {
+    const { http } = transport(
+      metadata(),
+      redirect(),
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(zipBytes.subarray(0, 2));
+            controller.enqueue(zipBytes.subarray(2));
+            controller.close();
+          },
+        }),
+      ),
+    );
+    await downloadReleaseArtifactArchive(receipt, { token, http }, path);
+    expect(http.mock.calls.map(([url]) => String(url))).toEqual([
+      "https://api.github.com/repos/angadsinghsandhu/angadsinghsandhu/actions/artifacts/17",
+      "https://api.github.com/repos/angadsinghsandhu/angadsinghsandhu/actions/artifacts/17/zip",
+      signedUrl,
+    ]);
+    expect(await readFile(path)).toEqual(Buffer.from(zipBytes));
+    expect((await stat(path)).mode & 0o777).toBe(0o600);
+  });
+});
+
+it("rejects an archive whose metadata names a different run attempt", async () => {
+  await withArchivePath(async (path) => {
+    const { http } = transport(metadata("portfolio-candidate-11-1"));
+    await expect(
+      downloadReleaseArtifactArchive(receipt, { token, http }, path),
+    ).rejects.toThrow(/proof does not match/u);
+    expect(http).toHaveBeenCalledOnce();
+    await expect(stat(path)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+});
+
+it("preserves a preexisting archive output", async () => {
+  await withArchivePath(async (path) => {
+    await writeFile(path, "existing");
+    const { http } = transport(metadata(), redirect(), new Response(zipBytes));
+    await expect(
+      downloadReleaseArtifactArchive(receipt, { token, http }, path),
+    ).rejects.toThrow(/create.*archive/u);
+    expect(http).toHaveBeenCalledOnce();
+    expect(await readFile(path, "utf8")).toBe("existing");
+  });
+});
+
+it("removes downloaded bytes when the digest differs from the receipt", async () => {
+  await withArchivePath(async (path) => {
+    const { http } = transport(
+      metadata(),
+      redirect(),
+      new Response(Uint8Array.of(80, 75)),
+    );
+    await expect(
+      downloadReleaseArtifactArchive(receipt, { token, http }, path),
+    ).rejects.toThrow(/digest does not match/u);
+    await expect(stat(path)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+});
+
+it("removes the partial file and sanitizes a storage failure", async () => {
+  await withArchivePath(async (path) => {
+    let firstChunk = true;
+    let partial: Buffer | undefined;
+    const body = new ReadableStream(
+      {
+        async pull(controller) {
+          if (firstChunk) {
+            firstChunk = false;
+            controller.enqueue(zipBytes.subarray(0, 2));
+            return;
+          }
+          partial = await readFile(path);
+          controller.error(new Error(signedUrl));
+        },
+      },
+      { highWaterMark: 0 },
+    );
+    const { http } = transport(metadata(), redirect(), new Response(body));
+    await expect(
+      downloadReleaseArtifactArchive(receipt, { token, http }, path),
+    ).rejects.toThrow(/^GitHub artifact archive storage body failed$/u);
+    expect(partial).toEqual(Buffer.from(zipBytes.subarray(0, 2)));
+    await expect(stat(path)).rejects.toMatchObject({ code: "ENOENT" });
+  });
 });
