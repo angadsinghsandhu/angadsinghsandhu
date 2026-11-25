@@ -65,6 +65,16 @@ Workflow outputs carry the receipt for the current run. GitHub artifact metadata
 
 Keep a separate durable history of confirmed known-good deployments with their exact receipts. For `readAuthorizedRollback`, look up the requested receipt in that history and require explicit rollback approval bound to the selected retained record. Return the stored receipt only when both the record and that approval match.
 
+### D1 publication journal rehearsal
+
+Run `npx vitest run tests/scripts/release-journal.test.ts` from `site` with Node 24.18.1. The suite applies `site/scripts/release-journal.sql` to a temporary SQLite database and executes the same statements the D1 adapter sends. It uses separate SQLite connections and fixture HTTP responses. [D1 SQL semantics](https://developers.cloudflare.com/d1/sql-api/sql-statements/). [D1 Query API](https://developers.cloudflare.com/api/resources/d1/subresources/database/methods/query/).
+
+Before enablement, approve the Cloudflare account, dedicated D1 database, Pages project and canonical HTTPS origin as one configuration. Apply the schema to an approved empty database at cutover. Give the protected, serialized publication and rollback jobs a separate account-scoped token with D1 Write permission for the journal. Keep Pages credentials separate. Restrict journal writes to those jobs and approved maintenance. Treat the account-scoped token as capable of accessing other D1 databases in that account.
+
+Each sequence is local to its Cloudflare account, project and origin. The journal retains every reservation and its terminal outcome, DB-generated UTC timestamps, the exact receipt, and either the verified Notes run and job identity or the approving rollback record's reference and known-good ID. A previous confirmed ID links to its receipt and deployment. The first reservation requires explicit first-cutover approval when there is no confirmed deployment. Record the existing host or DNS restoration plan separately.
+
+While holding publication serialization, check for pending work before treating an active receipt as a duplicate. Reserve with the observed active ID and a stable operation UUID before any provider change. Use that UUID to correlate provider evidence and resume the pending operation after an interruption. Call `confirmAfterProviderProof` only after verifying the operation's exact production deployment and the canonical host. Call `abortAfterProviderProof` only after proving the operation is terminal without activation, or after proving the previous host state has been restored and the interrupted operation can no longer activate. An ambiguous provider or D1 outcome requires a fresh read and reconciliation before any further mutation. A rejected or timed-out D1 reply may follow a committed transition. The journal records the caller's externally verified decision and cannot determine hosting state.
+
 ## Release checks
 
 - Investigate every missing or extra route, fragment or search result. Fix the source or adjust the reviewed inventory before rebuilding. The Pages ceiling is 20,000 files and 25 MiB per file. Generated text is capped at 500 physical lines. Sitemap shards preserve all canonical URLs within that cap.
