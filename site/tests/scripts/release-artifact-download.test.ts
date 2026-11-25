@@ -1,5 +1,8 @@
+import { once } from "node:events";
+import { createServer } from "node:http";
 import { expect, it, vi } from "vitest";
 import { readReleaseArtifactArchive } from "../../scripts/release-artifact-download.ts";
+import { createGitHubArchiveReader } from "../../scripts/release-artifact-transport.ts";
 
 const archive = Buffer.from(
   "UEsDBBQAAAAAAAAAIQCLntnTAQAAAAEAAAAKAAAAaW5kZXguaHRtbEFQSwECFAMUAAAAAAAAACEAi57Z0wEAAAABAAAACgAAAAAAAAAAAAAAgAEAAAAAaW5kZXguaHRtbFBLBQYAAAAAAQABADgAAAApAAAAAAA=",
@@ -104,3 +107,71 @@ it("keeps verified bytes intact when the reader reuses its buffer", async () => 
   buffer[40] ^= 1;
   expect(checked).toEqual(archive);
 });
+
+it.each(["original", "altered"])(
+  "checks exact authenticated metadata and verifies %s bytes through the ZIP transport",
+  async (bytes) => {
+    const payload = Buffer.from(archive);
+    if (bytes === "altered") payload[40] ^= 1;
+    const zipEndpoint = metadataEndpoint + "/zip";
+    const signedEndpoint = "https://archive.example.test/signed?sig=fixture";
+    const requests: unknown[] = [];
+    const server = createServer((request, response) => {
+      requests.push([
+        request.method,
+        request.url,
+        request.headers.authorization,
+      ]);
+      switch (request.url) {
+        case "/metadata":
+          response.setHeader("content-type", "application/json");
+          response.end(JSON.stringify(metadata));
+          break;
+        case "/zip":
+          response.writeHead(302, { location: signedEndpoint }).end();
+          break;
+        case "/signed?sig=fixture":
+          response.setHeader("content-length", payload.byteLength);
+          response.end(payload);
+          break;
+        default:
+          response.writeHead(404).end();
+      }
+    });
+    server.listen(0, "127.0.0.1");
+    try {
+      await once(server, "listening");
+      const address = server.address();
+      if (!address || typeof address === "string")
+        throw new Error("Missing listener");
+      const endpoints = new Map([
+        [metadataEndpoint, "/metadata"],
+        [zipEndpoint, "/zip"],
+        [signedEndpoint, "/signed?sig=fixture"],
+      ]);
+      const api = {
+        token: "fixture-token",
+        http: ((input, init) => {
+          const path = endpoints.get(String(input));
+          if (!path) throw new Error("Unexpected archive test request");
+          return fetch("http://127.0.0.1:" + address.port + path, init);
+        }) satisfies typeof fetch,
+      };
+      const result = readReleaseArtifactArchive(receipt, {
+        api,
+        readArchive: createGitHubArchiveReader(api),
+      });
+      if (bytes === "original") await expect(result).resolves.toEqual(archive);
+      else await expect(result).rejects.toThrow(/archive digest/u);
+      expect(requests).toEqual([
+        ["GET", "/metadata", "Bearer fixture-token"],
+        ["GET", "/zip", "Bearer fixture-token"],
+        ["GET", "/signed?sig=fixture", undefined],
+      ]);
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      });
+    }
+  },
+);

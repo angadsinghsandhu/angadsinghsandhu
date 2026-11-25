@@ -46,7 +46,7 @@ Production publication requires an authorized Notes sender workflow and a public
 The rehearsal uses GitHub response fixtures, two ZIP archives and a shared activation fixture. Run it from `site` on the pinned Node version.
 
 ```sh
-npx vitest run tests/scripts/release-publication.test.ts tests/scripts/release-artifact-download.test.ts
+npx vitest run tests/scripts/release-publication.test.ts tests/scripts/release-artifact-{download,transport}.test.ts
 ```
 
 The publication gate reads the current active receipt and rechecks both protected heads after acquiring the shared lock. It denies stale pairs and skips active duplicates before archive retrieval. It checks GitHub metadata for the receipt's exact archive ID, run, attempt, repository, Portfolio revision, digest and expiry, then hashes the downloaded archive bytes. For a normal release, it rereads both protected heads immediately before activation.
@@ -54,6 +54,10 @@ The publication gate reads the current active receipt and rechecks both protecte
 Rollback requires explicit authorization for the exact retained known-good receipt, even when its source heads have advanced. It uses the same metadata and byte checks. If the archive is expired, missing or has a different digest, the gate leaves the active release in place.
 
 The rehearsal uses unexpired GitHub artifacts for rollback verification. If the approved rollback window exceeds CI artifact expiry, the production adapter needs retained archives or restorable deployments with trustworthy stored identity and digest evidence. Production releases and rollbacks must share the same serialization gate. The activation adapter must keep the deployment and durable active receipt consistent across failures and retries.
+
+The GitHub archive reader supplies `readArchive` after the receipt verifier checks metadata. It makes a GET with an Actions read token to the exact Portfolio artifact ZIP URL. It follows the one-minute signed HTTPS location immediately, omits credentials and GitHub headers on the storage request, and refuses further redirects. An expired or failed read returns an error without the token, signed location or underlying transport details. [GitHub artifact download contract](https://docs.github.com/en/rest/actions/artifacts#download-an-artifact).
+
+The API request has a 15-second deadline and the storage request has five minutes to retrieve the ZIP. The 1.25 GiB download ceiling leaves room for ZIP overhead above the roughly 1.07 GB expanded certification. The reader checks the declared length when present and counts actual bytes even when storage omits it. Both the transport and receipt verifier buffer archive bytes, so confirm memory headroom on the target runner before enabling publication.
 
 ### Production state inputs
 

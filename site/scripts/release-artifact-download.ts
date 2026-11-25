@@ -3,7 +3,7 @@ import { z } from "zod";
 import { readGitHub } from "./release-source-proof.ts";
 
 const portfolioRepositoryId = 339077137;
-const artifactPath =
+export const releaseArtifactPath =
   "/repos/angadsinghsandhu/angadsinghsandhu/actions/artifacts/";
 const sha = z.string().regex(/^[a-f0-9]{40}(?![\s\S])/u);
 const id = z.number().int().positive();
@@ -38,7 +38,7 @@ export async function checkReleaseArtifactMetadata(
 ): Promise<ArtifactIdentity> {
   const expected = releaseArtifactIdentity.parse(receipt);
   const artifact = await readGitHub(
-    artifactPath + expected.artifactId,
+    releaseArtifactPath + expected.artifactId,
     api,
     githubArtifact,
   );
