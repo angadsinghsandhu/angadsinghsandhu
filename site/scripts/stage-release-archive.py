@@ -32,9 +32,13 @@ def check_central_directory(stream):
     size = trailer[zipfile._ECD_SIZE]
     if size > MAX_CENTRAL_BYTES:
         raise ValueError("ZIP central directory exceeds its size limit")
-    start = trailer[zipfile._ECD_LOCATION] - size
+    trailer_start = trailer[zipfile._ECD_LOCATION]
     if trailer[zipfile._ECD_SIGNATURE] == zipfile.stringEndArchive64:
-        start -= zipfile.sizeEndCentDir64 + zipfile.sizeEndCentDir64Locator
+        # Older CPython reports the classic marker even for a Zip64 trailer.
+        stream.seek(trailer_start)
+        if stream.read(len(zipfile.stringEndArchive)) == zipfile.stringEndArchive:
+            trailer_start -= zipfile.sizeEndCentDir64 + zipfile.sizeEndCentDir64Locator
+    start = trailer_start - size
     if (
         start < 0
         or start != trailer[zipfile._ECD_OFFSET]
