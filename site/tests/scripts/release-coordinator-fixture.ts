@@ -107,6 +107,8 @@ export function fixture(first = false) {
     badStageMarker: false,
     serveDeploy: true,
     deployResponseLost: false,
+    beforeUpload: () => {},
+    beforeRollback: () => {},
     observed: "confirmed" as "confirmed" | "failed" | "unknown",
     rollbackResponseLost: false,
     serveRollback: true,
@@ -206,7 +208,10 @@ export function fixture(first = false) {
   }
 
   const deploy = vi.fn<ReleaseCoordinatorGate["pages"]["deploy"]>(
-    async (operation) => {
+    async (operation, _stage, beforeUpload) => {
+      state.beforeUpload();
+      if (beforeUpload && !(await beforeUpload()))
+        return { status: "rejected" };
       state.attempted = true;
       if (state.serveDeploy) {
         state.serving = selectedId;
@@ -222,7 +227,13 @@ export function fixture(first = false) {
       throw new Error("hosting called without durable operation key");
   }
   const rollback = vi.fn<ReleaseCoordinatorGate["pages"]["rollback"]>(
-    async ({ receipt: target }, id) => {
+    async ({ receipt: target }, id, expectedServingId) => {
+      state.beforeRollback();
+      if (
+        expectedServingId !== undefined &&
+        state.serving !== expectedServingId
+      )
+        return { status: "unknown" };
       if (state.serveRollback) {
         state.serving = id;
         state.canonical = target;

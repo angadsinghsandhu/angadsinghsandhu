@@ -33,22 +33,19 @@ it("serializes concurrent candidates and only stages the still-current protected
 });
 
 it.each(["portfolio head", "Notes attempt", "Notes job"])(
-  "aborts prior to the provider call when the %s changes after staging",
+  "aborts before upload when the %s changes during provider preparation",
   async (failure) => {
     const f = fixture();
-    const begin = f.begin.getMockImplementation()!;
-    f.begin.mockImplementationOnce(async (input) => {
-      const reserved = await begin(input);
+    f.state.beforeUpload = () => {
       if (failure === "portfolio head") f.state.head = f.prior.portfolioSha;
       if (failure === "Notes attempt") f.state.notesAttempt++;
       if (failure === "Notes job") f.state.jobConclusion = "failure";
-      return reserved;
-    });
+    };
     await expect(
       coordinateRelease(releaseRequest, f.gate),
     ).resolves.toMatchObject({ decision: "deny" });
     expect(f.abort).toHaveBeenCalledExactlyOnceWith(3);
-    expect(f.deploy).not.toHaveBeenCalled();
+    expect(f.state.attempted).toBe(false);
   },
 );
 
@@ -164,6 +161,7 @@ it("restores the exact previous deployment on selected marker and failed smoke",
   expect(f.rollback).toHaveBeenCalledExactlyOnceWith(
     { receipt: f.prior },
     f.priorId,
+    f.selectedId,
   );
   expect(f.state.active?.deploymentId).toBe(f.priorId);
   expect(f.state.serving).toBe(f.priorId);
@@ -202,6 +200,7 @@ it("rolls back after artifact expiry by exact retained provider identity", async
   expect(f.rollback).toHaveBeenCalledExactlyOnceWith(
     { receipt: f.history.get(1)!.receipt },
     f.oldestId,
+    f.priorId,
   );
   expect(f.artifactHttp).not.toHaveBeenCalled();
   expect(f.state.active?.deploymentId).toBe(f.oldestId);
@@ -267,4 +266,88 @@ it("does not automatically restore if serving deployment changes while locating 
     decision: "pending",
   });
   expect(f.rollback).not.toHaveBeenCalled();
+});
+
+it.each(["automatic restore", "explicit rollback"] as const)(
+  "keeps %s pending if Pages finds a different live deployment during its preflight",
+  async (kind) => {
+    const f = fixture();
+    f.state.smokeSelected = false;
+    f.state.beforeRollback = () => {
+      f.state.serving = "10000000-0000-0000-0000-000000000009";
+    };
+    await expect(
+      coordinateRelease(
+        kind === "automatic restore" ? releaseRequest : rollbackRequest,
+        f.gate,
+      ),
+    ).resolves.toMatchObject({ decision: "pending" });
+    expect(f.state.serving).toBe("10000000-0000-0000-0000-000000000009");
+    expect(f.abort).not.toHaveBeenCalled();
+    expect(f.confirm).not.toHaveBeenCalled();
+  },
+);
+
+it("deploys the verified directory and executable even if staging later changes its descriptor", async () => {
+  const f = fixture();
+  const stageArchive = f.withStage.getMockImplementation()!;
+  let verifiedStage: Parameters<typeof f.deploy>[1] | undefined;
+  f.withStage.mockImplementationOnce((selected, run) =>
+    stageArchive(selected, async (stage) => {
+      verifiedStage = { ...stage };
+      const original = f.begin.getMockImplementation()!;
+      f.begin.mockImplementationOnce(async (input) => {
+        stage.directory = "/substituted-output";
+        stage.executable = "/substituted-executable";
+        return original(input);
+      });
+      return run(stage);
+    }),
+  );
+  await expect(
+    coordinateRelease(releaseRequest, f.gate),
+  ).resolves.toMatchObject({
+    decision: "confirmed",
+  });
+  expect(f.deploy.mock.calls[0][1]).toEqual(verifiedStage);
+});
+
+it.each(["unknown", "thrown", "unexplained rejection"] as const)(
+  "keeps a reservation pending after an %s preflight result",
+  async (result) => {
+    const f = fixture();
+    let uploadAllowed: boolean | undefined;
+    f.deploy.mockImplementationOnce(async (_request, _stage, beforeUpload) => {
+      if (result === "unexplained rejection") return { status: "rejected" };
+      f.state.notesAttempt++;
+      uploadAllowed = await beforeUpload?.();
+      if (result === "thrown") throw new Error("preflight transport lost");
+      return { status: "unknown" };
+    });
+    await expect(
+      coordinateRelease(releaseRequest, f.gate),
+    ).resolves.toMatchObject({
+      decision: "pending",
+    });
+    expect(f.abort).not.toHaveBeenCalled();
+    expect(f.state.pending?.id).toBe(3);
+    if (result !== "unexplained rejection") expect(uploadAllowed).toBe(false);
+  },
+);
+
+it("aborts before upload if the prior serving deployment changed during preparation", async () => {
+  const f = fixture();
+  let readsBeforePreflight = 0;
+  f.state.beforeUpload = () => {
+    readsBeforePreflight = f.sourceHttp.mock.calls.length;
+    f.state.serving = f.oldestId;
+  };
+  await expect(
+    coordinateRelease(releaseRequest, f.gate),
+  ).resolves.toMatchObject({
+    decision: "deny",
+  });
+  expect(f.state.attempted).toBe(false);
+  expect(f.abort).toHaveBeenCalledExactlyOnceWith(3);
+  expect(f.sourceHttp.mock.calls).toHaveLength(readsBeforePreflight);
 });

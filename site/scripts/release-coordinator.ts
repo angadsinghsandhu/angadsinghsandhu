@@ -43,7 +43,7 @@ export type ReleaseCoordinatorGate = Parameters<
   origin: string;
   serialized: <Result>(operation: () => Promise<Result>) => Promise<Result>;
   journal: Journal;
-  pages: Pages & { readServingDeploymentId: () => Promise<string | undefined> };
+  pages: Pages;
   // The staging adapter verifies archive metadata and bytes before providing private static output.
   withStage: (
     receipt: ReleaseReceipt,
@@ -58,7 +58,7 @@ export type ReleaseCoordinatorGate = Parameters<
   proveFirstCutoverFailure?: (pending: Row) => Promise<boolean>;
 };
 
-function deny(reason: string): Outcome {
+function deny(reason: string): Extract<Outcome, { decision: "deny" }> {
   return { decision: "deny", reason };
 }
 
@@ -190,7 +190,11 @@ async function reconcile(
     return waiting;
 
   const restored = await gate.pages
-    .rollback({ receipt: target.receipt }, target.deploymentId)
+    .rollback(
+      { receipt: target.receipt },
+      target.deploymentId,
+      proof.deploymentId,
+    )
     .catch(() => undefined);
   if (
     restored?.status === "confirmed" &&
@@ -221,7 +225,7 @@ async function release(
   if (initial.decision === "noop") return { decision: "noop" };
 
   return gate.withStage(receipt, async (stage) => {
-    const { directory } = stage;
+    const { directory, executable } = stage;
     if (!isAbsolute(directory) || (await realpath(directory)) !== directory)
       throw new Error(
         "Release staging must use the exact private output directory",
@@ -259,17 +263,36 @@ async function release(
       },
     });
 
-    const current = await evidence();
-    if (current.decision !== "publish") {
-      await close(gate, pending, null, "recovered");
-      return current.decision === "deny"
-        ? current
-        : deny("Release eligibility changed after staging");
-    }
-
-    await gate.pages
-      .deploy({ receipt, operationKey: pending.operationKey }, stage)
+    const preflight: { rejection?: ReturnType<typeof deny> } = {};
+    const response = await gate.pages
+      .deploy(
+        { receipt, operationKey: pending.operationKey },
+        { directory, executable },
+        async () => {
+          if (
+            active &&
+            (await gate.pages.readServingDeploymentId()) !== active.deploymentId
+          ) {
+            preflight.rejection = deny(
+              "Serving deployment changed during release preparation",
+            );
+            return false;
+          }
+          const current = await evidence();
+          preflight.rejection =
+            current.decision === "deny"
+              ? current
+              : current.decision === "noop"
+                ? deny("Release eligibility changed after staging")
+                : undefined;
+          return preflight.rejection === undefined;
+        },
+      )
       .catch(() => undefined);
+    if (response?.status === "rejected" && preflight.rejection) {
+      await close(gate, pending, null, "recovered");
+      return preflight.rejection;
+    }
     return reconcile(gate, pending, active, true);
   });
 }
@@ -281,6 +304,8 @@ async function rollback(
   activeHealthy: boolean,
 ): Promise<Outcome> {
   const { expectedActiveId, knownGoodId, reference } = request;
+  if (!active.deploymentId)
+    return deny("Current provider deployment is unavailable");
   if (
     expectedActiveId !== active.id ||
     !Number.isSafeInteger(knownGoodId) ||
@@ -313,7 +338,11 @@ async function rollback(
     rollbackApproval: { knownGoodId, reference },
   });
   await gate.pages
-    .rollback({ receipt: target.receipt }, target.deploymentId)
+    .rollback(
+      { receipt: target.receipt },
+      target.deploymentId,
+      active.deploymentId,
+    )
     .catch(() => undefined);
   return reconcile(gate, pending, active, true);
 }
