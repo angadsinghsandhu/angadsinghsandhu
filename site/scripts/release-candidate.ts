@@ -8,15 +8,20 @@ import {
   readProtectedHead,
 } from "./release-source-proof.ts";
 
-const portfolio = {
+export const portfolio = {
   repository: { id: 339077137, name: "angadsinghsandhu/angadsinghsandhu" },
   ref: "refs/heads/main",
 };
-const notesRepository = { id: 590347468, name: "angadsinghsandhu/Notes" };
-const workflowRef =
+export const notesRepository = {
+  id: 590347468,
+  name: "angadsinghsandhu/Notes",
+};
+export const workflowRef =
   portfolio.repository.name +
   "/.github/workflows/portfolio-release.yml@" +
   portfolio.ref;
+export const notesWorkflowId = 379127533;
+export const notesJobName = "verify";
 const sha = z.string().regex(/^[0-9a-f]{40}(?![\s\S])/u);
 const id = z.number().int().positive();
 const envelope = z.object({
@@ -78,8 +83,8 @@ export async function selectReleaseCandidate(
   const approval = {
     repository: notesRepository,
     ref: notesRef,
-    workflowId: 379127533,
-    jobName: "verify",
+    workflowId: notesWorkflowId,
+    jobName: notesJobName,
   };
 
   let dispatched;

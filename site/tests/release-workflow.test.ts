@@ -37,3 +37,61 @@ it("checks out an immutable Notes revision with read-only access", () => {
     "NOTES_REVISION: ${{ steps.notes.outputs.commit }}",
   );
 });
+
+const releases = readFileSync(
+  new URL("../../.github/workflows/portfolio-release.yml", import.meta.url),
+  "utf8",
+);
+const production = releases.split("\n  publish:\n")[1];
+
+it("keeps source and candidate build jobs separate from the protected production job", () => {
+  expect(production).toBeDefined();
+  expect(production).toContain("python-version: 3.12.14");
+  expect(production).toContain("needs: [select, build]");
+  expect(production).toContain("environment: portfolio-production");
+  expect(production).toContain(
+    "PORTFOLIO_SELECTED_RECEIPT: ${{ needs.build.outputs.release_receipt }}",
+  );
+  expect(production).toContain(
+    "PORTFOLIO_SELECTED_NOTES_RUN_ATTEMPT: ${{ needs.select.outputs.notes_run_attempt }}",
+  );
+  expect(production).toContain(
+    "PORTFOLIO_SELECTED_ORIGIN: ${{ needs.select.outputs.origin }}",
+  );
+  expect(releases.split("\n  publish:\n")[0]).not.toMatch(
+    /CLOUDFLARE|PRODUCTION_(?:JOURNAL|PAGES)_TOKEN/,
+  );
+});
+
+it("queues publication and operator work on the same protected target", () => {
+  const operator = readFileSync(
+    new URL("../../.github/workflows/portfolio-rollback.yml", import.meta.url),
+    "utf8",
+  );
+  for (const job of [production, operator]) {
+    expect(job).toMatch(
+      /concurrency:\n {6}group: portfolio-production\n {6}cancel-in-progress: false\n {6}queue: max/,
+    );
+    expect(job).toContain("environment: portfolio-production");
+    expect(job).toContain("github.ref_protected");
+    expect(job).toContain("persist-credentials: false");
+    expect(job).toContain("node-version: 24.18.1");
+    const [before, credentials] = job.split(
+      "run: node scripts/release-production.ts --check",
+    );
+    expect(before).toContain("npm run bootstrap");
+    expect(before).toContain("= true ]");
+    expect(before).not.toContain("secrets.");
+    expect(credentials).toContain(
+      "if: steps.activation.outputs.enabled == 'true'",
+    );
+    expect(credentials).toContain("secrets.PORTFOLIO_PRODUCTION_PAGES_TOKEN");
+    expect(credentials).toContain("secrets.PORTFOLIO_PRODUCTION_JOURNAL_TOKEN");
+    expect(credentials).toContain("run: node scripts/release-production.ts\n");
+  }
+  expect(operator).toContain("workflow_dispatch:");
+  expect(operator).toContain("PORTFOLIO_PRODUCTION_OPERATOR_ID");
+  expect(operator).not.toContain("PORTFOLIO_PRODUCTION_ARTIFACT_TOKEN");
+  expect(operator).toContain("github.run_attempt == '1'");
+  expect(operator).not.toContain("${{ inputs.");
+});

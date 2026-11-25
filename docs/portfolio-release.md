@@ -35,11 +35,11 @@ The required `Verify portfolio` job runs for opened, reopened and updated pull r
 
 A dispatch carries `repository`, `ref`, `sha` and numeric `runId` in `client_payload`. Source selection verifies GitHub's sender and target repository, checks that the workflow SHA is the current protected Portfolio `main` commit, and checks Notes workflow `379127533` and its required `verify` job for the same protected Notes commit. A Portfolio push discovers the eligible Notes run for the current approved Notes head. A dispatch supplies the run to check. The chooser records both source SHAs and the Notes run ID and attempt.
 
-The build uses clean, SHA-pinned checkouts. After standalone verification, it exports Notes into runner temporary storage, imports the export and receipt, builds with the approved origin, writes the [release marker](#hosted-release-identity), certifies the output, and runs the Chromium archive suite. The upload retains only `site/dist` as `portfolio-candidate-<run ID>-<attempt>`. The candidate workflow has no deployment job or hosting credentials.
+The build uses clean, SHA-pinned checkouts. After standalone verification, it exports Notes into runner temporary storage, imports the export and receipt, builds with the approved origin, writes the [release marker](#hosted-release-identity), certifies the output, and runs the Chromium archive suite. The upload retains only `site/dist` as `portfolio-candidate-<run ID>-<attempt>`. The source-selection and candidate-build jobs have no hosting credentials. The separate publication job runs only after both succeed and the build exposes its validated receipt.
 
 After upload, the build job rereads the validated production snapshot and checks GitHub artifact metadata with the job’s read-only Actions token. The check binds the artifact ID, archive SHA-256, repository, Portfolio revision and exact run-attempt name, and requires a current expiration. On success, the job exposes its separate JSON `release_receipt` output with the Portfolio and Notes SHAs, snapshot schema and manifest digest, run ID and attempt, artifact ID, and archive SHA-256. A failed check leaves the job without a receipt. The receipt stays outside the archive.
 
-Production publication requires an authorized Notes sender workflow and a publication gate connected to approved hosting and durable release state.
+Production publication also requires the separate controls and host configuration below.
 
 ### Hosted release identity
 
@@ -65,7 +65,7 @@ The GitHub archive reader supplies `readArchive` after the receipt verifier chec
 
 The API request has a 15-second deadline and the storage request has five minutes to retrieve the ZIP. The 1.25 GiB download ceiling leaves room for ZIP overhead above the roughly 1.07 GB expanded certification. The reader checks the declared length when present and counts actual bytes even when storage omits it. Both the transport and receipt verifier buffer archive bytes, so confirm memory headroom on the target runner before enabling publication.
 
-### Production state inputs
+### Rehearsal state inputs
 
 Workflow outputs carry the receipt for the current run. GitHub artifact metadata identifies the Portfolio run and archive. For `readVerified`, persist the verified release receipt and the successful candidate build proof together in trusted durable storage after the checks and receipt binding pass. Include the exact Notes verification repository, ref, workflow ID, run ID and attempt, and the required job's success for the receipt's Notes SHA. Return the selected `notes_run_attempt` from source selection as `notesRunAttempt` alongside the receipt and Notes candidate in the trusted `readVerified` record. The stored proof binds that SHA and the snapshot manifest digest to the checked candidate.
 
@@ -88,6 +88,57 @@ Run `npx vitest run tests/scripts/release-pages.test.ts` from `site` with Node 2
 The deployment lists the checked Portfolio commit and the commit message `portfolio:v1:<operation UUID>:<receipt SHA-256>`. The digest covers the eight receipt fields in the adapter's fixed serialization order. Under the same release serialization, lookup scans the bounded project deployment listing for a unique matching production operation. Cloudflare reports the total deployment count across both production and preview, so the lookup pages through the unfiltered history. The match must be for the exact project, production branch, Portfolio commit and receipt. Terminal success requires the completed `deploy` stage, success status and a deployment that was not skipped. CLI success records submission only. A missing record, conflicting records, incomplete pagination, schema change or in-progress stage leaves the operation pending. A canonical marker matching the prior release can coexist with a pending provider mutation. [List deployments contract](https://developers.cloudflare.com/api/resources/pages/subresources/projects/subresources/deployments/methods/list/).
 
 For an authorized rollback, read the approved known-good deployment UUID from the journal and verify its production status and exact receipt digest against the current provider record. Use that UUID for the rollback request and require the provider response to confirm the same deployment identity. The restored deployment retains its original upload operation UUID. Canonical marker and same-origin route checks must pass before recording confirmation in D1. A missing or unverified target leaves the operation pending, even when the original GitHub ZIP is still available. A retained successful production deployment can be restored after the ZIP expires. [Get deployment contract](https://developers.cloudflare.com/api/resources/pages/subresources/projects/subresources/deployments/methods/get/). [Rollback API contract](https://developers.cloudflare.com/api/resources/pages/subresources/projects/subresources/deployments/methods/rollback/). [Pages rollback retention](https://developers.cloudflare.com/pages/configuration/rollbacks/).
+
+## Production publication and operator recovery
+
+Production publication and operator work start disabled. Before enabling either job, approve the account, Pages project, D1 database, exact canonical origin, current protected source refs, Notes sender and operator. Configure the GitHub `portfolio-production` environment to allow deployments only from protected Portfolio `main`. Approve first cutover and the initial settings separately. After cutover, use branch restrictions that allow eligible routine publication without waiting for a human review on each run. The operator workflow still requires the approved numeric actor ID. Grant the source token read-only repository and Actions access as described above and keep the Cloudflare tokens in the protected environment. The build job cannot read those environment secrets.
+
+| Setting                                                                                               | Approved value                                                                                                                                                                                       |
+| ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PORTFOLIO_PRODUCTION_ENABLED`                                                                        | Repository flag. Exact lower-case `true` permits automatic publication from the protected candidate workflow after both jobs succeed.                                                                |
+| `PORTFOLIO_PRODUCTION_FIRST_CUTOVER`                                                                  | Exact lower-case `true` permits an initial reservation when there is no confirmed release. Set it only for the approved first cutover and clear it immediately afterward.                            |
+| `PORTFOLIO_PRODUCTION_AUTOMATIC_RESTORE`                                                              | Exact lower-case `true` permits a fresh failed publication to restore the verified previous deployment under the approved policy.                                                                    |
+| `PORTFOLIO_PRODUCTION_OPERATIONS_ENABLED`                                                             | Repository flag. Exact lower-case `true` permits operator rollback and reconciliation independently of publication.                                                                                  |
+| `PORTFOLIO_PRODUCTION_OPERATOR_ID`                                                                    | Approved numeric GitHub account ID. The first run attempt must carry this exact ID in the runner actor and dispatch sender.                                                                          |
+| `PORTFOLIO_PRODUCTION_ORIGIN`                                                                         | Exact approved HTTPS origin with no trailing slash. Publication compares it byte for byte with `PORTFOLIO_RELEASE_ORIGIN` as selected by the candidate job.                                          |
+| `PORTFOLIO_PRODUCTION_ACCOUNT_ID`, `PORTFOLIO_PRODUCTION_PROJECT`, `PORTFOLIO_PRODUCTION_DATABASE_ID` | Approved Cloudflare account ID, Pages project name, and dedicated D1 database UUID. The Pages production branch is `main`.                                                                           |
+| `PORTFOLIO_PRODUCTION_LEGACY_PATH`, `PORTFOLIO_PRODUCTION_LEGACY_TARGET`                              | Optional exact same-origin source and destination paths from a reviewed redirect that both candidate and retained known-good releases serve as 308. Leave both unset while there is no such mapping. |
+| `PORTFOLIO_PRODUCTION_JOURNAL_TOKEN`, `PORTFOLIO_PRODUCTION_PAGES_TOKEN`                              | Protected environment secrets with D1 Write and Pages Write permissions respectively for the approved account. Each adapter receives its own credential.                                             |
+
+Both jobs use the repository's `portfolio-production` Actions concurrency group with `cancel-in-progress: false` and `queue: max`. Routine production writes go through this queue. Pages and D1 access outside the workflow is reserved for separately authorized emergency operations. The final provider read and upload or rollback are separate requests, so console or API writes that bypass the queue can race them. The queue can hold up to 100 waiting jobs, and eligibility is checked when work executes. GitHub may start eligible runs in a different order than dispatch time. [GitHub Actions concurrency syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#concurrency).
+
+The publication runner tests the exact opt-in, installs the locked dependencies on Node 24.18.1, loads Python 3.12.14 and runs a credential-free input check. The execution step rereads the current protected Portfolio default branch and head and uses only the successful build's same-run receipt, selected Notes run and exact Notes run attempt. The coordinator rereads both protected heads and the Notes proof before staging and after reservation. The archive is written and verified in a private directory under the runner's canonical absolute `RUNNER_TEMP`. The staging adapter removes its own directory on exit. Python receives an empty environment. Wrangler 4.168.0 runs from an empty private directory with only the Pages token and runtime settings. The Pages adapter checks the exact immutable deployment, project serving deployment ID, and canonical release marker. The credential-free host smoke checks canonical home, Library, Interview and Search pages, the Pagefind runtime and English index metadata, a representative archive PDF and its file signature, and the approved 308 mapping when configured. The host probes use ten-second request deadlines, bounded bodies and exact same-origin destinations.
+
+Use a new dispatch on the current protected `main` for every operator action. For rollback, obtain separate approval for the exact known-good journal sequence. Read the current active sequence, and confirm with the approved Pages project that the known-good deployment is still retained. The provider must confirm that deployment ID and receipt after the rollback. Record the retention window and test it at cutover, because Pages retention determines whether the rollback can still work after the original GitHub artifact expires. Use the actual sequence values and audit reference in this command.
+
+```sh
+gh workflow run portfolio-rollback.yml --repo angadsinghsandhu/angadsinghsandhu --ref main \
+  -f operation=rollback \
+  -f expected_active_id=42 \
+  -f known_good_id=37 \
+  -f reference=incident-123
+```
+
+Use dedicated reconciliation for an interrupted or pending journal operation.
+
+```sh
+gh workflow run portfolio-rollback.yml --repo angadsinghsandhu/angadsinghsandhu --ref main \
+  -f operation=recover
+```
+
+The job logs its decision and journal operation number when available. `confirmed` records a newly confirmed activation or rollback. `noop` means the requested state required no new mutation after verification. `recovered` refers to previously reserved or restored work and succeeds only for a dedicated recovery dispatch. `pending` and `deny` fail the job. The immutable release receipt stays in the journal separately from the rollback approval reference.
+
+If reconciliation remains pending, capture the journal operation number, operation UUID, expected prior deployment, exact provider deployment event or response evidence, and observed canonical marker. Freeze publication and escalate to the approved recovery owner. A missing listing entry, a prior marker, or a healthy previous host alone leaves a lost restore outcome unresolved. The wrapper has no terminal-restore or first-cutover failure proof callback. For a first cutover with no prior confirmed Pages deployment, use the separately approved DNS or withdrawal procedure when the host state cannot be established. Treat unresolved state as pending until independently recorded provider evidence and canonical smoke establish the exact result. Any out-of-band provider or journal recovery requires separate authorization and recorded evidence. Before routine enablement, verify the Pages project's `canonical_deployment` agrees with the canonical host before and after rollback on the approved destination. Disagreement keeps the operation pending.
+
+Use the credential-free tests and the narrowly scoped actionlint exception during local verification. Actionlint 1.7.12 rejects the supported `queue` key. The workflow contract test pins that exact queue configuration. Remove this exception when actionlint supports the key.
+
+```sh
+actionlint -ignore '^unexpected key "queue" for "concurrency" section\. expected one of "cancel-in-progress", "group"$' \
+  .github/workflows/portfolio-release.yml .github/workflows/portfolio-rollback.yml
+
+cd site
+npx vitest run tests/release-workflow.test.ts tests/scripts/release-production.test.ts tests/scripts/release-smoke.test.ts
+```
 
 ## Release checks
 
