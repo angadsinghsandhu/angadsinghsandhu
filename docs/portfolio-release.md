@@ -39,7 +39,21 @@ The build uses clean, SHA-pinned checkouts. After standalone verification, it ex
 
 After upload, the build job rereads the validated production snapshot and checks GitHub artifact metadata with the job’s read-only Actions token. The check binds the artifact ID, archive SHA-256, repository, Portfolio revision and exact run-attempt name, and requires a current expiration. On success, the job exposes its separate JSON `release_receipt` output with the Portfolio and Notes SHAs, snapshot schema and manifest digest, run ID and attempt, artifact ID, and archive SHA-256. A failed check leaves the job without a receipt. The receipt stays outside the archive.
 
-Production publication still requires an authorized Notes sender workflow and an authorized, serialized publication gate that rechecks source freshness, verifies the downloaded archive digest against the receipt, and uses the checked artifact. Retained known-good state and rollback authorization belong to that gate.
+Production publication requires an authorized Notes sender workflow and a publication gate connected to approved hosting and durable release state.
+
+## Credential-free publication rehearsal
+
+The rehearsal uses GitHub response fixtures, two ZIP archives and a shared activation fixture. Run it from `site` on the pinned Node version.
+
+```sh
+npx vitest run tests/scripts/release-publication.test.ts tests/scripts/release-artifact-download.test.ts
+```
+
+The publication gate reads the current active receipt and rechecks both protected heads after acquiring the shared lock. It denies stale pairs and skips active duplicates before archive retrieval. It checks GitHub metadata for the receipt's exact archive ID, run, attempt, repository, Portfolio revision, digest and expiry, then hashes the downloaded archive bytes. For a normal release, it rereads both protected heads immediately before activation.
+
+Rollback requires explicit authorization for the exact retained known-good receipt, even when its source heads have advanced. It uses the same metadata and byte checks. If the archive is expired, missing or has a different digest, the gate leaves the active release in place.
+
+The rehearsal uses unexpired GitHub artifacts for rollback verification. If the approved rollback window exceeds CI artifact expiry, the production adapter needs retained archives or restorable deployments with trustworthy stored identity and digest evidence. Production releases and rollbacks must share the same serialization gate. The activation adapter must keep the deployment and durable active receipt consistent across failures and retries.
 
 ## Release checks
 
