@@ -195,6 +195,55 @@ test("drafts are excluded and a fixture project links to its details", async ({
   ).toBe(404);
 });
 
+test("the published music video requests its player only after Play", async ({
+  page,
+  baseURL,
+}) => {
+  const embedUrl = "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ";
+  const siteOrigin = new URL("/", baseURL).origin;
+  const externalRequests: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).origin !== siteOrigin)
+      externalRequests.push(request.url());
+  });
+  await page.route(embedUrl, (route) =>
+    route.fulfill({ contentType: "text/html", body: "<title>YouTube</title>" }),
+  );
+
+  await page.goto("/music/");
+  await page.getByRole("link", { name: "Never Gonna Give You Up" }).click();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Never Gonna Give You Up" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/Rick Astley’s official music video/),
+  ).toBeVisible();
+  await expect(page.locator("main img, main iframe")).toHaveCount(0);
+  expect(externalRequests).toEqual([]);
+
+  const [response] = await Promise.all([
+    page.waitForResponse(embedUrl),
+    page.getByRole("button", { name: "Play release" }).click(),
+  ]);
+  expect(response.ok()).toBe(true);
+  await expect(page.locator("iframe")).toHaveAttribute("src", embedUrl);
+  await page.getByRole("button", { name: "Close player" }).click();
+  await expect(page.locator("iframe")).toHaveCount(0);
+});
+
+test("the published music video links to YouTube with JavaScript disabled", async ({
+  browser,
+  baseURL,
+}) => {
+  const page = await browser.newPage({ javaScriptEnabled: false, baseURL });
+  await page.goto("/music/");
+  await page.getByRole("link", { name: "Never Gonna Give You Up" }).click();
+  await expect(
+    page.getByRole("link", { name: "Watch on YouTube" }),
+  ).toHaveAttribute("href", "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  await page.close();
+});
+
 test("the fixture release fetches and plays media only on request", async ({
   page,
 }) => {
