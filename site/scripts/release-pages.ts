@@ -150,6 +150,7 @@ function receiptDigest(receipt: ReleaseReceipt): string {
 async function readBody(
   response: Response,
   signal: AbortSignal,
+  maxBytes: number,
 ): Promise<unknown> {
   if (response.status !== 200 || response.redirected || !response.body) {
     void response.body?.cancel().catch(() => {});
@@ -163,7 +164,7 @@ async function readBody(
       const { done, value } = await reader.read();
       if (done) break;
       size += value.byteLength;
-      if (size > maxResponseBytes) {
+      if (size > maxBytes) {
         void reader.cancel().catch(() => {});
         return undefined;
       }
@@ -253,6 +254,7 @@ export function createReleasePages(
     url: URL,
     method: "GET" | "POST" = "GET",
     signal = AbortSignal.timeout(timeout),
+    maxBytes = maxResponseBytes,
   ) {
     try {
       const response = await fetchPages(url, {
@@ -263,7 +265,9 @@ export function createReleasePages(
         cache: "no-store",
         signal,
       });
-      return providerResponse.safeParse(await readBody(response, signal)).data;
+      return providerResponse.safeParse(
+        await readBody(response, signal, maxBytes),
+      ).data;
     } catch {
       return undefined;
     }
@@ -295,7 +299,7 @@ export function createReleasePages(
       `${deploymentsUrl}/${deploymentId}${method === "POST" ? "/rollback" : ""}`,
     );
     const candidate = deployment.safeParse(
-      (await request(url, method))?.result,
+      (await request(url, method, undefined, 16 * maxResponseBytes))?.result,
     ).data;
     if (
       candidate?.id !== deploymentId ||
