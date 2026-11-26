@@ -141,7 +141,7 @@ describe("Pages provider", () => {
       ],
       [request, envelope(rows)],
       [request, new Response("sensitive", { status: 302 })],
-      [request, new Response("x".repeat(1024 * 1024 + 1))],
+      [request, page([deployment({ padding: "x".repeat(1024 * 1024) })])],
     ] as const;
     for (const [expected, response] of cases) {
       const pages = createReleasePages({
@@ -150,6 +150,43 @@ describe("Pages provider", () => {
       });
       expect(await pages.observe(expected)).toEqual(unknown);
     }
+  });
+
+  it("reads and rolls back an exact deployment with a large asset manifest", async () => {
+    const files = Object.fromEntries(
+      Array.from({ length: 16_000 }, (_, index) => [
+        `/notes/lesson-assets/${"a".repeat(65)}/${index}.html`,
+        "b".repeat(32),
+      ]),
+    );
+    const payload = deployment({ files });
+    expect(JSON.stringify(payload).length).toBeGreaterThan(1024 * 1024);
+    const fetchFixture = vi.fn<typeof fetch>(async () => envelope(payload));
+    const pages = createReleasePages({ ...target, fetch: fetchFixture });
+    await expect(pages.readDeployment(request, deploymentId)).resolves.toEqual(
+      confirmed,
+    );
+    await expect(pages.rollback(request, deploymentId)).resolves.toEqual(
+      confirmed,
+    );
+    expect(fetchFixture.mock.calls.map(([, init]) => init?.method)).toEqual([
+      "GET",
+      "GET",
+      "POST",
+    ]);
+  });
+
+  it("rejects an exact deployment response beyond the manifest budget", async () => {
+    const fetchFixture = vi.fn<typeof fetch>(async () =>
+      envelope(
+        deployment({ files: { "/large.html": "a".repeat(16 * 1024 * 1024) } }),
+      ),
+    );
+    const pages = createReleasePages({ ...target, fetch: fetchFixture });
+    await expect(pages.rollback(request, deploymentId)).resolves.toEqual(
+      unknown,
+    );
+    expect(fetchFixture).toHaveBeenCalledOnce();
   });
 
   it("requires a validation read and valid POST response for an immutable rollback target", async () => {
