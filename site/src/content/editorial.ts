@@ -19,7 +19,7 @@ export type Project = Entry & {
 };
 
 export type MusicRelease = Entry & {
-  cover: { src: string; alt: string };
+  cover?: { src: string; alt: string };
   embedUrl: string;
   providers: readonly EditorialLink[];
   tracks: readonly string[];
@@ -166,7 +166,23 @@ export const projects: readonly Project[] = [
     ],
   },
 ];
-export const releases: readonly MusicRelease[] = [];
+export const releases: readonly MusicRelease[] = [
+  {
+    slug: "never-gonna-give-you-up",
+    title: "Never Gonna Give You Up",
+    summary: "Rick Astley’s official music video.",
+    status: "approved",
+    embedUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
+    providers: [
+      {
+        label: "Watch on YouTube",
+        href: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      },
+    ],
+    tracks: ["Never Gonna Give You Up"],
+    credits: [{ role: "Performer", name: "Rick Astley" }],
+  },
+];
 
 export function approved<T extends Publication>(entries: readonly T[]) {
   return entries.filter((entry) => entry.status === "approved");

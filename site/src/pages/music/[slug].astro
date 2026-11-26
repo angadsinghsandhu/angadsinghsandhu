@@ -20,7 +20,7 @@ const { title, summary, cover, embedUrl, providers, tracks, credits } =
 ---
 
 <SiteLayout title={title} description={summary}>
-  <article class="record">
+  <article class:list={["record", { "record--coverless": !cover }]}>
     <header>
       <a class="label" href="/music/">
         Music
@@ -28,7 +28,7 @@ const { title, summary, cover, embedUrl, providers, tracks, credits } =
       <h1>{title}</h1>
       <p>{summary}</p>
     </header>
-    <img src={cover.src} alt={cover.alt} width="600" height="600" />
+    {cover && <img src={cover.src} alt={cover.alt} width="600" height="600" />}
     <div class="playback">
       <MusicPlayer {title} {embedUrl} />
       {providers.length > 0 && (
@@ -76,6 +76,17 @@ const { title, summary, cover, embedUrl, providers, tracks, credits } =
     grid-template-rows: auto auto 1fr;
     align-items: start;
     gap: 18px clamp(18px, 4vw, 52px);
+  }
+
+  .record--coverless {
+    grid-template-areas: "header" "playback" "credits";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    max-width: 720px;
+  }
+
+  .record--coverless :global(iframe) {
+    aspect-ratio: 16 / 9;
   }
 
   header {
@@ -154,7 +165,7 @@ const { title, summary, cover, embedUrl, providers, tracks, credits } =
   }
 
   @media (max-width: 620px) {
-    .record {
+    .record:not(.record--coverless) {
       grid-template-areas: "header" "cover" "playback" "credits";
       grid-template-columns: minmax(0, 1fr);
       grid-template-rows: auto;
