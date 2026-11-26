@@ -1,0 +1,81 @@
+---
+interface Props {
+  title: string;
+  embedUrl: string;
+}
+
+const { title, embedUrl } = Astro.props;
+---
+
+<music-player>
+  <button
+    type="button"
+    class="action action--primary"
+    aria-expanded="false"
+    aria-controls="music-embed"
+    hidden
+  >
+    Play release
+  </button>
+  <p role="status"></p>
+  <div id="music-embed"></div>
+  <template>
+    <iframe
+      src={embedUrl}
+      title={`Player for ${title}`}
+      allow="autoplay; encrypted-media; fullscreen"
+      allowfullscreen
+    ></iframe>
+  </template>
+</music-player>
+
+<script>
+  class MusicPlayer extends HTMLElement {
+    connectedCallback() {
+      const button = this.querySelector("button");
+      const status = this.querySelector('[role="status"]');
+      const container = this.querySelector("#music-embed");
+      const template = this.querySelector("template");
+      if (!button || !status || !container || !template) return;
+
+      button.hidden = false;
+      button.onclick = () => {
+        const opening = button.getAttribute("aria-expanded") !== "true";
+        button.setAttribute("aria-expanded", String(opening));
+        button.textContent = opening ? "Close player" : "Play release";
+        status.textContent = opening
+          ? "Use the controls in the release player."
+          : "";
+        container.replaceChildren(
+          ...(opening ? [template.content.cloneNode(true)] : []),
+        );
+      };
+    }
+  }
+
+  customElements.define("music-player", MusicPlayer);
+</script>
+
+<style>
+  music-player {
+    display: block;
+  }
+
+  p {
+    margin-top: 8px;
+    font-size: 0.875rem;
+  }
+
+  p:empty {
+    margin: 0;
+  }
+
+  #music-embed :global(iframe) {
+    display: block;
+    width: 100%;
+    min-height: 180px;
+    margin-block-start: 12px;
+    border: 1px solid var(--rule);
+    background: var(--graphite);
+  }
+</style>

@@ -1,0 +1,11 @@
+{
+  "plugins": ["prettier-plugin-astro"],
+  "overrides": [
+    { "files": "*.astro", "options": { "parser": "astro" } },
+    { "files": "*.svg", "options": { "parser": "html" } },
+    {
+      "files": "src/lib/notes-snapshot-v1.ts",
+      "options": { "singleQuote": true }
+    }
+  ]
+}

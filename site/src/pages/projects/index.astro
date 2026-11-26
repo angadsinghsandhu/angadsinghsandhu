@@ -1,0 +1,19 @@
+---
+import EditorialList from "../../components/EditorialList.astro";
+import EditorialPage from "../../components/EditorialPage.astro";
+import { publishedProjects } from "../../content/catalog";
+
+const entries = publishedProjects.map(({ slug, title, summary }) => ({
+  href: `/projects/${slug}/`,
+  title,
+  summary,
+}));
+---
+
+<EditorialPage title="Projects">
+  {entries.length ? (
+    <EditorialList entries={entries} />
+  ) : (
+    <p>No projects published yet.</p>
+  )}
+</EditorialPage>

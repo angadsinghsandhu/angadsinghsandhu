@@ -1,0 +1,9 @@
+/site/node_modules/
+/site/dist/
+/site/.astro/
+/site/.vite/
+/site/.browsers/
+/site/.install-*/
+/site/playwright-report/
+/site/test-results/
+/site/.generated/

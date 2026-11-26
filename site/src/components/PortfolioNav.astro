@@ -1,0 +1,118 @@
+---
+const pathname = Astro.url.pathname.replace(/\/index\.html$/u, "/");
+const primary = [
+  { label: "Work", href: "/projects/", wide: true },
+  { label: "Interview", href: "/interview/", wide: false },
+  { label: "Notes", href: "/library/", wide: true },
+  { label: "Music", href: "/music/", wide: true },
+];
+const menu = [
+  { label: "Projects", href: "/projects/" },
+  { label: "Résumé", href: "/resume/" },
+  { label: "Notes", href: "/library/", wide: true },
+  { label: "Music", href: "/music/", wide: true },
+  { label: "Blog", href: "/blog/" },
+  { label: "Movies", href: "/movies/" },
+  { label: "Interesting Stuff", href: "/interesting/" },
+];
+---
+
+<nav aria-label="Portfolio">
+  {primary.map(({ label, href, wide }) => (
+    <a
+      class:list={["nav-link", { wide }]}
+      href={href}
+      aria-current={pathname === href ? "page" : undefined}
+    >
+      {label}
+    </a>
+  ))}
+  <details>
+    <summary>Menu</summary>
+    <ul>
+      {menu.map(({ label, href, wide }) => (
+        <li class:list={[{ alternate: wide }]}>
+          <a
+            class="nav-link"
+            href={href}
+            aria-current={pathname === href ? "page" : undefined}
+          >
+            {label}
+          </a>
+        </li>
+      ))}
+    </ul>
+  </details>
+</nav>
+
+<style>
+  nav {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.94rem;
+  }
+
+  .nav-link,
+  summary {
+    min-height: var(--target);
+    padding: 10px 9px;
+    color: var(--ink);
+    line-height: 24px;
+    text-decoration: none;
+    white-space: nowrap;
+    transition:
+      background-color var(--control-motion) ease,
+      color var(--control-motion) ease;
+  }
+
+  .nav-link {
+    display: block;
+  }
+
+  [aria-current="page"],
+  details[open] summary {
+    background: var(--active);
+    color: var(--accent);
+  }
+
+  details {
+    position: relative;
+  }
+
+  ul {
+    position: absolute;
+    right: 0;
+    z-index: 3;
+    width: max-content;
+    min-width: 168px;
+    max-width: calc(100vw - 36px);
+    margin: 5px 0 0;
+    padding: 4px;
+    border: 1px solid var(--rule);
+    background: var(--graphite);
+    list-style: none;
+  }
+
+  .alternate {
+    display: none;
+  }
+
+  @media (hover: hover) {
+    .nav-link:hover,
+    summary:hover {
+      background: var(--active);
+      color: var(--accent);
+    }
+  }
+
+  @media (max-width: 620px) {
+    .wide {
+      display: none;
+    }
+
+    .alternate {
+      display: block;
+    }
+  }
+</style>

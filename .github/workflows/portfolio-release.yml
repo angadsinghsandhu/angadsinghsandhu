@@ -1,0 +1,203 @@
+name: Portfolio release candidate
+
+on:
+  push:
+    branches: [main]
+  repository_dispatch:
+    types: [portfolio-notes-verified]
+
+permissions:
+  contents: read
+
+jobs:
+  select:
+    name: Select verified sources
+    # The expression skips unset values before assigning a runner. The shell checks case.
+    if: vars.PORTFOLIO_RELEASE_CANDIDATE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: site
+    outputs:
+      portfolio_sha: ${{ steps.sources.outputs.portfolio_sha }}
+      notes_sha: ${{ steps.sources.outputs.notes_sha }}
+      notes_run_id: ${{ steps.sources.outputs.notes_run_id }}
+      notes_run_attempt: ${{ steps.sources.outputs.notes_run_attempt }}
+      origin: ${{ steps.sources.outputs.origin }}
+    steps:
+      - name: Check exact activation flag
+        id: activation
+        working-directory: .
+        env:
+          RELEASE_CANDIDATE_FLAG: ${{ vars.PORTFOLIO_RELEASE_CANDIDATE_ENABLED }}
+        run: |
+          if [ "$RELEASE_CANDIDATE_FLAG" = true ]; then
+            printf 'enabled=true\n' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        if: steps.activation.outputs.enabled == 'true'
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        if: steps.activation.outputs.enabled == 'true'
+        with:
+          node-version: 24.18.1
+      - run: npm run bootstrap
+        if: steps.activation.outputs.enabled == 'true'
+      - name: Read GitHub source proof
+        if: steps.activation.outputs.enabled == 'true'
+        id: sources
+        env:
+          PORTFOLIO_RELEASE_NOTES_REF: ${{ vars.PORTFOLIO_RELEASE_NOTES_REF }}
+          PORTFOLIO_RELEASE_NOTES_SENDER_ID: ${{ vars.PORTFOLIO_RELEASE_NOTES_SENDER_ID }}
+          PORTFOLIO_ORIGIN: ${{ vars.PORTFOLIO_RELEASE_ORIGIN }}
+          PORTFOLIO_RELEASE_SOURCE_TOKEN: ${{ secrets.PORTFOLIO_RELEASE_SOURCE_TOKEN }}
+        run: node scripts/release-candidate.ts
+
+  build:
+    name: Verify and retain candidate
+    needs: select
+    if: needs.select.outputs.portfolio_sha != ''
+    permissions:
+      actions: read
+      contents: read
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: site
+    outputs:
+      release_receipt: ${{ steps.receipt.outputs.release_receipt }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.select.outputs.portfolio_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.18.1
+      - run: npm run bootstrap
+      - run: npx playwright install --with-deps chromium
+      - run: npm run verify
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: angadsinghsandhu/Notes
+          ref: ${{ needs.select.outputs.notes_sha }}
+          path: site/.generated/notes-checkout
+          persist-credentials: false
+      - run: npm ci
+        working-directory: site/.generated/notes-checkout/site
+      - name: Verify combined Portfolio and Notes
+        env:
+          PORTFOLIO_SHA: ${{ needs.select.outputs.portfolio_sha }}
+          NOTES_REVISION: ${{ needs.select.outputs.notes_sha }}
+          PORTFOLIO_ORIGIN: ${{ needs.select.outputs.origin }}
+          PORTFOLIO_NOTES_BROWSER: archive
+        run: |
+          staging="$(mktemp -d "$RUNNER_TEMP/portfolio-notes.XXXXXX")"
+          (
+            cd .generated/notes-checkout/site
+            ./node_modules/.bin/tsx scripts/export-portfolio.ts --out "$staging/export" --revision "$NOTES_REVISION" > "$staging/receipt.json"
+          )
+          npm run import:notes -- --from "$staging/export" --receipt "$staging/receipt.json" --revision "$NOTES_REVISION"
+          npm run build:release
+          node scripts/release-build-marker.ts
+          npm run verify:output -- --dir dist --release-marker
+          npm run test:browser
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        id: candidate
+        with:
+          name: portfolio-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: site/dist
+          if-no-files-found: error
+          include-hidden-files: true
+      - name: Bind release receipt to the uploaded artifact
+        id: receipt
+        env:
+          PORTFOLIO_SHA: ${{ needs.select.outputs.portfolio_sha }}
+          NOTES_REVISION: ${{ needs.select.outputs.notes_sha }}
+          CANDIDATE_ARTIFACT_ID: ${{ steps.candidate.outputs.artifact-id }}
+          CANDIDATE_ARTIFACT_DIGEST: ${{ steps.candidate.outputs.artifact-digest }}
+          PORTFOLIO_ARTIFACT_TOKEN: ${{ github.token }}
+        run: node scripts/release-artifact-proof.ts
+
+  publish:
+    name: Publish the verified production candidate
+    needs: [select, build]
+    if: >-
+      vars.PORTFOLIO_PRODUCTION_ENABLED == 'true' &&
+      github.repository == 'angadsinghsandhu/angadsinghsandhu' &&
+      github.ref == 'refs/heads/main' && github.ref_protected &&
+      github.workflow_ref == 'angadsinghsandhu/angadsinghsandhu/.github/workflows/portfolio-release.yml@refs/heads/main' &&
+      github.sha == github.workflow_sha &&
+      (github.event_name == 'push' || github.event_name == 'repository_dispatch') &&
+      needs.build.outputs.release_receipt != ''
+    environment: portfolio-production
+    concurrency:
+      group: portfolio-production
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: bash
+        working-directory: site
+    env:
+      PORTFOLIO_PRODUCTION_ENABLED: ${{ vars.PORTFOLIO_PRODUCTION_ENABLED }}
+      PORTFOLIO_PRODUCTION_FIRST_CUTOVER: ${{ vars.PORTFOLIO_PRODUCTION_FIRST_CUTOVER }}
+      PORTFOLIO_PRODUCTION_AUTOMATIC_RESTORE: ${{ vars.PORTFOLIO_PRODUCTION_AUTOMATIC_RESTORE }}
+      PORTFOLIO_PRODUCTION_ORIGIN: ${{ vars.PORTFOLIO_PRODUCTION_ORIGIN }}
+      PORTFOLIO_PRODUCTION_LEGACY_PATH: ${{ vars.PORTFOLIO_PRODUCTION_LEGACY_PATH }}
+      PORTFOLIO_PRODUCTION_LEGACY_TARGET: ${{ vars.PORTFOLIO_PRODUCTION_LEGACY_TARGET }}
+      PORTFOLIO_RELEASE_NOTES_REF: ${{ vars.PORTFOLIO_RELEASE_NOTES_REF }}
+      PORTFOLIO_RELEASE_NOTES_SENDER_ID: ${{ vars.PORTFOLIO_RELEASE_NOTES_SENDER_ID }}
+      PORTFOLIO_SELECTED_SHA: ${{ needs.select.outputs.portfolio_sha }}
+      PORTFOLIO_SELECTED_NOTES_SHA: ${{ needs.select.outputs.notes_sha }}
+      PORTFOLIO_SELECTED_NOTES_RUN_ID: ${{ needs.select.outputs.notes_run_id }}
+      PORTFOLIO_SELECTED_NOTES_RUN_ATTEMPT: ${{ needs.select.outputs.notes_run_attempt }}
+      PORTFOLIO_SELECTED_ORIGIN: ${{ needs.select.outputs.origin }}
+      PORTFOLIO_SELECTED_RECEIPT: ${{ needs.build.outputs.release_receipt }}
+    steps:
+      - name: Check exact publication flag
+        id: activation
+        working-directory: .
+        run: |
+          if [ "$PORTFOLIO_PRODUCTION_ENABLED" = true ]; then
+            printf 'enabled=true\n' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        if: steps.activation.outputs.enabled == 'true'
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        if: steps.activation.outputs.enabled == 'true'
+        with:
+          node-version: 24.18.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        if: steps.activation.outputs.enabled == 'true'
+        id: python
+        with:
+          python-version: 3.12.14
+      - run: npm run bootstrap
+        if: steps.activation.outputs.enabled == 'true'
+      - name: Check protected publication context and receipt
+        if: steps.activation.outputs.enabled == 'true'
+        run: node scripts/release-production.ts --check
+      - name: Execute production publication
+        if: steps.activation.outputs.enabled == 'true'
+        env:
+          PORTFOLIO_RELEASE_SOURCE_TOKEN: ${{ secrets.PORTFOLIO_RELEASE_SOURCE_TOKEN }}
+          PORTFOLIO_PRODUCTION_ARTIFACT_TOKEN: ${{ github.token }}
+          PORTFOLIO_PRODUCTION_JOURNAL_TOKEN: ${{ secrets.PORTFOLIO_PRODUCTION_JOURNAL_TOKEN }}
+          PORTFOLIO_PRODUCTION_PAGES_TOKEN: ${{ secrets.PORTFOLIO_PRODUCTION_PAGES_TOKEN }}
+          PORTFOLIO_PRODUCTION_ACCOUNT_ID: ${{ vars.PORTFOLIO_PRODUCTION_ACCOUNT_ID }}
+          PORTFOLIO_PRODUCTION_DATABASE_ID: ${{ vars.PORTFOLIO_PRODUCTION_DATABASE_ID }}
+          PORTFOLIO_PRODUCTION_PROJECT: ${{ vars.PORTFOLIO_PRODUCTION_PROJECT }}
+          PORTFOLIO_PRODUCTION_PYTHON: ${{ steps.python.outputs.python-path }}
+        run: node scripts/release-production.ts

@@ -1,0 +1,86 @@
+name: Portfolio production operations
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Roll back to a known-good deployment or reconcile pending work
+        type: choice
+        required: true
+        options: [recover, rollback]
+        default: recover
+      expected_active_id:
+        description: Current journal sequence ID for rollback
+        type: string
+        required: false
+      known_good_id:
+        description: Approved known-good journal sequence ID for rollback
+        type: string
+        required: false
+      reference:
+        description: Audit reference for the rollback approval
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  operate:
+    name: Reconcile or roll back Portfolio production
+    if: >-
+      vars.PORTFOLIO_PRODUCTION_OPERATIONS_ENABLED == 'true' &&
+      github.repository == 'angadsinghsandhu/angadsinghsandhu' &&
+      github.ref == 'refs/heads/main' && github.ref_protected &&
+      github.workflow_ref == 'angadsinghsandhu/angadsinghsandhu/.github/workflows/portfolio-rollback.yml@refs/heads/main' &&
+      github.sha == github.workflow_sha &&
+      github.event_name == 'workflow_dispatch' && github.run_attempt == '1'
+    environment: portfolio-production
+    concurrency:
+      group: portfolio-production
+      cancel-in-progress: false
+      queue: max
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+        working-directory: site
+    env:
+      PORTFOLIO_PRODUCTION_OPERATIONS_ENABLED: ${{ vars.PORTFOLIO_PRODUCTION_OPERATIONS_ENABLED }}
+      PORTFOLIO_PRODUCTION_OPERATOR_ID: ${{ vars.PORTFOLIO_PRODUCTION_OPERATOR_ID }}
+      PORTFOLIO_PRODUCTION_ORIGIN: ${{ vars.PORTFOLIO_PRODUCTION_ORIGIN }}
+      PORTFOLIO_PRODUCTION_LEGACY_PATH: ${{ vars.PORTFOLIO_PRODUCTION_LEGACY_PATH }}
+      PORTFOLIO_PRODUCTION_LEGACY_TARGET: ${{ vars.PORTFOLIO_PRODUCTION_LEGACY_TARGET }}
+    steps:
+      - name: Check exact operator flag
+        id: activation
+        working-directory: .
+        run: |
+          if [ "$PORTFOLIO_PRODUCTION_OPERATIONS_ENABLED" = true ]; then
+            printf 'enabled=true\n' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        if: steps.activation.outputs.enabled == 'true'
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        if: steps.activation.outputs.enabled == 'true'
+        with:
+          node-version: 24.18.1
+      - run: npm run bootstrap
+        if: steps.activation.outputs.enabled == 'true'
+      - name: Check protected operator context
+        if: steps.activation.outputs.enabled == 'true'
+        run: node scripts/release-production.ts --check
+      - name: Execute production operation
+        if: steps.activation.outputs.enabled == 'true'
+        env:
+          PORTFOLIO_RELEASE_SOURCE_TOKEN: ${{ secrets.PORTFOLIO_RELEASE_SOURCE_TOKEN }}
+          PORTFOLIO_PRODUCTION_JOURNAL_TOKEN: ${{ secrets.PORTFOLIO_PRODUCTION_JOURNAL_TOKEN }}
+          PORTFOLIO_PRODUCTION_PAGES_TOKEN: ${{ secrets.PORTFOLIO_PRODUCTION_PAGES_TOKEN }}
+          PORTFOLIO_PRODUCTION_ACCOUNT_ID: ${{ vars.PORTFOLIO_PRODUCTION_ACCOUNT_ID }}
+          PORTFOLIO_PRODUCTION_DATABASE_ID: ${{ vars.PORTFOLIO_PRODUCTION_DATABASE_ID }}
+          PORTFOLIO_PRODUCTION_PROJECT: ${{ vars.PORTFOLIO_PRODUCTION_PROJECT }}
+        run: node scripts/release-production.ts

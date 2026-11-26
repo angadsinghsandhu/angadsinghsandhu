@@ -1,0 +1,48 @@
+---
+import type { ContentEntry } from "../../lib/notes-types";
+import { sectionLabels } from "../../lib/notes-catalog";
+import { folderRoute, type Folder } from "../../lib/notes-folders";
+interface Props {
+  entry?: ContentEntry;
+  folder?: Folder;
+  title?: string;
+}
+const { entry, folder, title } = Astro.props;
+const section = entry?.section ?? folder?.section;
+const segments = entry?.groupSegments ?? folder?.segments ?? [];
+---
+
+<nav aria-label="Breadcrumbs" class="breadcrumbs" data-pagefind-ignore>
+  <ol>
+    <li>
+      <a href="/">Home</a>
+    </li>
+    <li>
+      <a href="/library/">Library</a>
+    </li>
+    {section && (
+      <>
+        <li>
+          {folder && segments.length === 0 ? (
+            <span aria-current="page">{sectionLabels[section]}</span>
+          ) : (
+            <a href={folderRoute(section, [])}>{sectionLabels[section]}</a>
+          )}
+        </li>
+        {segments.map((segment, index) => (
+          <li>
+            {folder && index === segments.length - 1 ? (
+              <span aria-current="page">{segment}</span>
+            ) : (
+              <a href={folderRoute(section, segments.slice(0, index + 1))}>
+                {segment}
+              </a>
+            )}
+          </li>
+        ))}
+      </>
+    )}
+    {entry && <li aria-current="page">{entry.title}</li>}
+    {!entry && !folder && title && <li aria-current="page">{title}</li>}
+  </ol>
+</nav>

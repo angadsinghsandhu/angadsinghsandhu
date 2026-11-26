@@ -1,0 +1,24 @@
+---
+import LibraryLayout from "../../../layouts/LibraryLayout.astro";
+import Breadcrumbs from "../../../components/notes/Breadcrumbs.astro";
+import OrganizationTree from "../../../components/notes/OrganizationTree.astro";
+import { readPreparedCatalog } from "../../../lib/notes-catalog";
+import { organizationTree } from "../../../lib/notes-organization-pages";
+const catalog = await readPreparedCatalog();
+---
+
+<LibraryLayout
+  title="Topics"
+  description="Find a concept across the curated source material."
+>
+  <div data-pagefind-ignore>
+    <Breadcrumbs title="Topics" />
+    <h1>Topics</h1>
+    <p>Find a concept across the curated source material.</p>
+    <nav aria-label="Topic tree">
+      <OrganizationTree
+        nodes={organizationTree(catalog.organization, "topic")}
+      />
+    </nav>
+  </div>
+</LibraryLayout>

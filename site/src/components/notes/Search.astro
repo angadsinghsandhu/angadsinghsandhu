@@ -1,0 +1,90 @@
+---
+import {
+  readPreparedCatalog,
+  sectionLabels,
+  type LibraryNode,
+} from "../../lib/notes-catalog";
+const catalog = await readPreparedCatalog();
+const topics: LibraryNode[] = [];
+function collectTopics(parent?: string): void {
+  for (const node of catalog.organization.listNodes("topic", parent)) {
+    topics.push(node);
+    collectTopics(node.id);
+  }
+}
+collectTopics();
+const collections = catalog.organization.listNodes("collection");
+---
+
+<noscript>
+  <p>
+    Search requires JavaScript. <a href="/library/">Browse the library</a> to
+    read without it.
+  </p>
+</noscript>
+<form class="search-form" role="search" data-search-form>
+  <label class="search-field">
+    Search notes and resources
+    <input type="search" name="q" autocomplete="off" />
+  </label>
+  <div class="search-filters">
+    <label>
+      Scope
+      <select name="scope">
+        <option value="learning" selected>
+          Learning material
+        </option>
+        <option value="files">All files</option>
+      </select>
+    </label>
+    <label>
+      Topic
+      <select name="topic">
+        <option value="">All topics</option>
+        {topics.map((topic) => (
+          <option value={topic.id}>{topic.title}</option>
+        ))}
+      </select>
+    </label>
+    <label>
+      Collection
+      <select name="collection">
+        <option value="">All collections</option>
+        {collections.map((collection) => (
+          <option value={collection.id}>{collection.title}</option>
+        ))}
+      </select>
+    </label>
+    <label>
+      Section
+      <select name="section">
+        <option value="">All sections</option>
+        {Object.entries(sectionLabels).map(([value, label]) => (
+          <option value={value}>{label}</option>
+        ))}
+      </select>
+    </label>
+    <label>
+      Kind
+      <select name="kind">
+        <option value="">All kinds</option>
+        {["markdown", "notebook", "code", "pdf", "slides"].map((kind) => (
+          <option value={kind}>{kind}</option>
+        ))}
+      </select>
+    </label>
+  </div>
+  <button type="submit">Search</button>
+  <button type="reset">Reset filters</button>
+</form>
+<p role="status" aria-live="polite" data-search-status>
+  Enter a phrase to search notes and resources.
+</p>
+<ol class="search-results" data-search-results></ol>
+<button type="button" data-search-more hidden>
+  Load more results
+</button>
+<script>
+  import { initSearch } from "../../client/search.js";
+  initSearch(document);
+</script>

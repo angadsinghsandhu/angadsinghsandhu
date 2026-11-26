@@ -1,0 +1,402 @@
+{
+  "node_modules/@img/sharp-linuxmusl-x64": {
+    "version": "0.35.5",
+    "resolved": "https://registry.npmjs.org/@img/sharp-linuxmusl-x64/-/sharp-linuxmusl-x64-0.35.5.tgz",
+    "integrity": "sha512-4KOphqB035HrVdqLZfCgMzzERrQkkzOwRhl4OAkRO1YCldbaFjySXMaK534Mo0V+LndnlJk+sbUyLeU0ULyD1A==",
+    "cpu": ["x64"],
+    "libc": ["musl"],
+    "license": "Apache-2.0",
+    "optional": true,
+    "os": ["linux"],
+    "engines": {
+      "node": ">=20.9.0"
+    },
+    "funding": {
+      "url": "https://opencollective.com/libvips"
+    },
+    "optionalDependencies": {
+      "@img/sharp-libvips-linuxmusl-x64": "1.3.4"
+    }
+  },
+  "node_modules/@img/sharp-wasm32": {
+    "version": "0.35.5",
+    "resolved": "https://registry.npmjs.org/@img/sharp-wasm32/-/sharp-wasm32-0.35.5.tgz",
+    "integrity": "sha512-Ptsga1su4tQx+LLF1ECS9U6nz5kmrXKo6XVbtR48Ke3ZRxxgaWBu7IDtEe1quo8hiupwm6WFqxVlXaSf7IINGQ==",
+    "license": "Apache-2.0 AND LGPL-3.0-or-later AND MIT",
+    "optional": true,
+    "dependencies": {
+      "@emnapi/runtime": "^1.11.3"
+    },
+    "engines": {
+      "node": ">=20.9.0"
+    },
+    "funding": {
+      "url": "https://opencollective.com/libvips"
+    }
+  },
+  "node_modules/@img/sharp-webcontainers-wasm32": {
+    "version": "0.35.5",
+    "resolved": "https://registry.npmjs.org/@img/sharp-webcontainers-wasm32/-/sharp-webcontainers-wasm32-0.35.5.tgz",
+    "integrity": "sha512-hfhF/FmoQyTUkA0bIKFOtw536BQSeBMe6BF6QyWlrPxT754+TFLaZ7sKKTfvvM0yJgKgaYTwnFCIZ/GuDw5SUA==",
+    "cpu": ["wasm32"],
+    "license": "Apache-2.0",
+    "optional": true,
+    "dependencies": {
+      "@img/sharp-wasm32": "0.35.5"
+    },
+    "engines": {
+      "node": ">=20.9.0"
+    },
+    "funding": {
+      "url": "https://opencollective.com/libvips"
+    }
+  },
+  "node_modules/@img/sharp-win32-arm64": {
+    "version": "0.35.5",
+    "resolved": "https://registry.npmjs.org/@img/sharp-win32-arm64/-/sharp-win32-arm64-0.35.5.tgz",
+    "integrity": "sha512-X4t7g+7ZA5DKblCBEXGjUqqemj4vczING/5viFwAL8h4N3qYeyjwdCvRLHi4EdOUI+2Z7UFlp1VM+p/AuEtm6Q==",
+    "cpu": ["arm64"],
+    "license": "Apache-2.0 AND LGPL-3.0-or-later",
+    "optional": true,
+    "os": ["win32"],
+    "engines": {
+      "node": ">=20.9.0"
+    },
+    "funding": {
+      "url": "https://opencollective.com/libvips"
+    }
+  },
+  "node_modules/@img/sharp-win32-ia32": {
+    "version": "0.35.5",
+    "resolved": "https://registry.npmjs.org/@img/sharp-win32-ia32/-/sharp-win32-ia32-0.35.5.tgz",
+    "integrity": "sha512-5Zm82LoBc43nhwNybZlG7Y1KO//Zhsn306fQl29ZOuStHLGTo3BWL83q3cznX0poxSAMuYL1On/BHBxkBeKr6A==",
+    "cpu": ["ia32"],
+    "license": "Apache-2.0 AND LGPL-3.0-or-later",
+    "optional": true,
+    "os": ["win32"],
+    "engines": {
+      "node": "^20.9.0"
+    },
+    "funding": {
+      "url": "https://opencollective.com/libvips"
+    }
+  },
+  "node_modules/@img/sharp-win32-x64": {
+    "version": "0.35.5",
+    "resolved": "https://registry.npmjs.org/@img/sharp-win32-x64/-/sharp-win32-x64-0.35.5.tgz",
+    "integrity": "sha512-x76eH0vEiHlcMQu8Y8IenntaACtddpT6W0wmXtWrnKcnKI7ME5DdgqhAD6SEWOEl1v2zDvkZDhFA9KnURwpfqg==",
+    "cpu": ["x64"],
+    "license": "Apache-2.0 AND LGPL-3.0-or-later",
+    "optional": true,
+    "os": ["win32"],
+    "engines": {
+      "node": ">=20.9.0"
+    },
+    "funding": {
+      "url": "https://opencollective.com/libvips"
+    }
+  },
+  "node_modules/@isaacs/nonrecursive-glob-match": {
+    "version": "1.1.0",
+    "resolved": "https://registry.npmjs.org/@isaacs/nonrecursive-glob-match/-/nonrecursive-glob-match-1.1.0.tgz",
+    "integrity": "sha512-GPm/Dbvk5RLmhRnxXIa7nTpK0xtl4E0wj0MslsuNiJ1FIROU+2+9lgUC/dgF7Ey4QCWhfEsgxilMRMCdHPfDfw==",
+    "dev": true,
+    "license": "BlueOak-1.0.0"
+  },
+  "node_modules/@jridgewell/resolve-uri": {
+    "version": "3.1.3",
+    "resolved": "https://registry.npmjs.org/@jridgewell/resolve-uri/-/resolve-uri-3.1.3.tgz",
+    "integrity": "sha512-lhTtjtoEArWBjismtfS761S9Hlyn+nIZqOZVYoZ1Xn82PMNMVnk+jj/NhC4fAXGTs7ydONcJiR5vyQBTMDu27g==",
+    "dev": true,
+    "license": "MIT",
+    "engines": {
+      "node": ">=6.0.0"
+    }
+  },
+  "node_modules/@jridgewell/sourcemap-codec": {
+    "version": "1.6.0",
+    "resolved": "https://registry.npmjs.org/@jridgewell/sourcemap-codec/-/sourcemap-codec-1.6.0.tgz",
+    "integrity": "sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw==",
+    "license": "MIT"
+  },
+  "node_modules/@jridgewell/trace-mapping": {
+    "version": "0.3.31",
+    "resolved": "https://registry.npmjs.org/@jridgewell/trace-mapping/-/trace-mapping-0.3.31.tgz",
+    "integrity": "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==",
+    "dev": true,
+    "license": "MIT",
+    "dependencies": {
+      "@jridgewell/resolve-uri": "^3.1.0",
+      "@jridgewell/sourcemap-codec": "^1.4.14"
+    }
+  },
+  "node_modules/@keyv/bigmap": {
+    "version": "1.3.1",
+    "resolved": "https://registry.npmjs.org/@keyv/bigmap/-/bigmap-1.3.1.tgz",
+    "integrity": "sha512-WbzE9sdmQtKy8vrNPa9BRnwZh5UF4s1KTmSK0KUVLo3eff5BlQNNWDnFOouNpKfPKDnms9xynJjsMYjMaT/aFQ==",
+    "dev": true,
+    "license": "MIT",
+    "dependencies": {
+      "hashery": "^1.4.0",
+      "hookified": "^1.15.0"
+    },
+    "engines": {
+      "node": ">= 18"
+    },
+    "peerDependencies": {
+      "keyv": "^5.6.0"
+    }
+  },
+  "node_modules/@keyv/serialize": {
+    "version": "1.1.1",
+    "resolved": "https://registry.npmjs.org/@keyv/serialize/-/serialize-1.1.1.tgz",
+    "integrity": "sha512-dXn3FZhPv0US+7dtJsIi2R+c7qWYiReoEh5zUntWCf4oSpMNib8FDhSoed6m3QyZdx5hK7iLFkYk3rNxwt8vTA==",
+    "dev": true,
+    "license": "MIT"
+  },
+  "node_modules/@napi-rs/canvas": {
+    "version": "1.2.0",
+    "resolved": "https://registry.npmjs.org/@napi-rs/canvas/-/canvas-1.2.0.tgz",
+    "integrity": "sha512-6LpJr0U9BH/Iz5/z2EherYStmsjyRwmCp8wwYg0QfEnib/ip19fyJd1Y1OFbn8DbyIQKCCpSqgY1trXkIbLdEg==",
+    "license": "MIT",
+    "optional": true,
+    "workspaces": ["e2e/*"],
+    "engines": {
+      "node": ">= 10"
+    },
+    "funding": {
+      "type": "github",
+      "url": "https://github.com/sponsors/Brooooooklyn"
+    },
+    "optionalDependencies": {
+      "@napi-rs/canvas-android-arm64": "1.2.0",
+      "@napi-rs/canvas-darwin-arm64": "1.2.0",
+      "@napi-rs/canvas-darwin-x64": "1.2.0",
+      "@napi-rs/canvas-linux-arm-gnueabihf": "1.2.0",
+      "@napi-rs/canvas-linux-arm64-gnu": "1.2.0",
+      "@napi-rs/canvas-linux-arm64-musl": "1.2.0",
+      "@napi-rs/canvas-linux-riscv64-gnu": "1.2.0",
+      "@napi-rs/canvas-linux-x64-gnu": "1.2.0",
+      "@napi-rs/canvas-linux-x64-musl": "1.2.0",
+      "@napi-rs/canvas-win32-arm64-msvc": "1.2.0",
+      "@napi-rs/canvas-win32-x64-msvc": "1.2.0"
+    }
+  },
+  "node_modules/@napi-rs/canvas-android-arm64": {
+    "version": "1.2.0",
+    "resolved": "https://registry.npmjs.org/@napi-rs/canvas-android-arm64/-/canvas-android-arm64-1.2.0.tgz",
+    "integrity": "sha512-Ya2Db4BrwM5WnQtdmA2iOw5O2yZ9vcd5fuX9GjlkQ3k87iWzDUxnijVz11IJrF8c+xBxUHzEgENXmA1yPdnZ2g==",
+    "cpu": ["arm64"],
+    "license": "MIT",
+    "optional": true,
+    "os": ["android"],
+    "engines": {
+      "node": ">= 10"
+    },
+    "funding": {
+      "type": "github",
+      "url": "https://github.com/sponsors/Brooooooklyn"
+    }
+  },
+  "node_modules/@napi-rs/canvas-darwin-arm64": {
+    "version": "1.2.0",
+    "resolved": "https://registry.npmjs.org/@napi-rs/canvas-darwin-arm64/-/canvas-darwin-arm64-1.2.0.tgz",
+    "integrity": "sha512-7Rq4h2J4Y+JKqxaH9Zf0PGOY3asTeAbcG51MkQNaUTB7ushbhuEgY54CWRww5WK8v8VYB8epv4bLF0GI8IPlxQ==",
+    "cpu": ["arm64"],
+    "license": "MIT",
+    "optional": true,
+    "os": ["darwin"],
+    "engines": {
+      "node": ">= 10"
+    },
+    "funding": {
+      "type": "github",
+      "url": "https://github.com/sponsors/Brooooooklyn"
+    }
+  },
+  "node_modules/@napi-rs/canvas-darwin-x64": {
+    "version": "1.2.0",
+    "resolved": "https://registry.npmjs.org/@napi-rs/canvas-darwin-x64/-/canvas-darwin-x64-1.2.0.tgz",
+    "integrity": "sha512-LHeqXtEFqO1DDnKRWSvy7C+kXQTciKvZzShVZd0aTnvVwWskpbj9hwWc8lwTpjm6GsgS7oEKCNARj8xLI1qcww==",
+    "cpu": ["x64"],
+    "license": "MIT",
+    "optional": true,
+    "os": ["darwin"],
+    "engines": {
+      "node": ">= 10"
+    },
+    "funding": {
+      "type": "github",
+      "url": "https://github.com/sponsors/Brooooooklyn"
+    }
+  },
+  "node_modules/@napi-rs/canvas-linux-arm-gnueabihf": {
+    "version": "1.2.0",
+    "resolved": "https://registry.npmjs.org/@napi-rs/canvas-linux-arm-gnueabihf/-/canvas-linux-arm-gnueabihf-1.2.0.tgz",
+    "integrity": "sha512-er2hS9KLBWSFMyz6UCAAM5gYfFfCAkLXXdPnFJ8SL8clNa+hx5ooC5iREYKuaFxIfhsE86OHiiee3HjIuvtz5w==",
+    "cpu": ["arm"],
+    "license": "MIT",
+    "optional": true,
+    "os": ["linux"],
+    "engines": {
+      "node": ">= 10"
+    },
+    "funding": {
+      "type": "github",
+      "url": "https://github.com/sponsors/Brooooooklyn"
+    }
+  },
+  "node_modules/@napi-rs/canvas-linux-arm64-gnu": {
+    "version": "1.2.0",
+    "resolved": "https://registry.npmjs.org/@napi-rs/canvas-linux-arm64-gnu/-/canvas-linux-arm64-gnu-1.2.0.tgz",
+    "integrity": "sha512-wwfgI/DQOXjpQ+uLDV7R2Wh6O0lLvWRWz3mZND58csTH9fTn6+H2bfWBIu37Bcg8cjJLPE5BKjqK/a7WOYeqxA==",
+    "cpu": ["arm64"],
+    "libc": ["glibc"],
+    "license": "MIT",
+    "optional": true,
+    "os": ["linux"],
+    "engines": {
+      "node": ">= 10"
+    },
+    "funding": {
+      "type": "github",
+      "url": "https://github.com/sponsors/Brooooooklyn"
+    }
+  },
+  "node_modules/@napi-rs/canvas-linux-arm64-musl": {
+    "version": "1.2.0",
+    "resolved": "https://registry.npmjs.org/@napi-rs/canvas-linux-arm64-musl/-/canvas-linux-arm64-musl-1.2.0.tgz",
+    "integrity": "sha512-ftJFcPZIAer2xHMQ0BXfGTVqE2AB5tl3+dm913YunKnsG+lcS91pFKNaeM5yvp7kbTLPlMxkMpi+RKXOXEwljw==",
+    "cpu": ["arm64"],
+    "libc": ["musl"],
+    "license": "MIT",
+    "optional": true,
+    "os": ["linux"],
+    "engines": {
+      "node": ">= 10"
+    },
+    "funding": {
+      "type": "github",
+      "url": "https://github.com/sponsors/Brooooooklyn"
+    }
+  },
+  "node_modules/@napi-rs/canvas-linux-riscv64-gnu": {
+    "version": "1.2.0",
+    "resolved": "https://registry.npmjs.org/@napi-rs/canvas-linux-riscv64-gnu/-/canvas-linux-riscv64-gnu-1.2.0.tgz",
+    "integrity": "sha512-NFfXv9E3IuzHi3RK3KhBbjO4bCdS8PvZkUzVvkTWBCLnVw4ndNNHUCK46/lcOMcnuKg8qxQsK5X7Uwp/SPGA0g==",
+    "cpu": ["riscv64"],
+    "libc": ["glibc"],
+    "license": "MIT",
+    "optional": true,
+    "os": ["linux"],
+    "engines": {
+      "node": ">= 10"
+    },
+    "funding": {
+      "type": "github",
+      "url": "https://github.com/sponsors/Brooooooklyn"
+    }
+  },
+  "node_modules/@napi-rs/canvas-linux-x64-gnu": {
+    "version": "1.2.0",
+    "resolved": "https://registry.npmjs.org/@napi-rs/canvas-linux-x64-gnu/-/canvas-linux-x64-gnu-1.2.0.tgz",
+    "integrity": "sha512-+RsdhlUA8hRoktgA5JG1XR7skZ6PCVjNfodnqDnBV1eTX7dgVBYHK7O7yKdQGac/45B5t8ufgyceQEq3Rfk6JA==",
+    "cpu": ["x64"],
+    "libc": ["glibc"],
+    "license": "MIT",
+    "optional": true,
+    "os": ["linux"],
+    "engines": {
+      "node": ">= 10"
+    },
+    "funding": {
+      "type": "github",
+      "url": "https://github.com/sponsors/Brooooooklyn"
+    }
+  },
+  "node_modules/@napi-rs/canvas-linux-x64-musl": {
+    "version": "1.2.0",
+    "resolved": "https://registry.npmjs.org/@napi-rs/canvas-linux-x64-musl/-/canvas-linux-x64-musl-1.2.0.tgz",
+    "integrity": "sha512-G7O6pLdb+waaiRfCVKNRymqFNulfU4tfyRKvWmOWt7Vh/VltHLvU4+oWGMMKzWehMrxLnvmeLSNkWWpzMZAy+w==",
+    "cpu": ["x64"],
+    "libc": ["musl"],
+    "license": "MIT",
+    "optional": true,
+    "os": ["linux"],
+    "engines": {
+      "node": ">= 10"
+    },
+    "funding": {
+      "type": "github",
+      "url": "https://github.com/sponsors/Brooooooklyn"
+    }
+  },
+  "node_modules/@napi-rs/canvas-win32-arm64-msvc": {
+    "version": "1.2.0",
+    "resolved": "https://registry.npmjs.org/@napi-rs/canvas-win32-arm64-msvc/-/canvas-win32-arm64-msvc-1.2.0.tgz",
+    "integrity": "sha512-8xB9DHYScFsEukONZKfc45bTYJUAfEqL6daUxo3YqWrUC9YMfU6N2Zx3HCJTq0LwhnjjRXScZbasaaxviaA4uQ==",
+    "cpu": ["arm64"],
+    "license": "MIT",
+    "optional": true,
+    "os": ["win32"],
+    "engines": {
+      "node": ">= 10"
+    },
+    "funding": {
+      "type": "github",
+      "url": "https://github.com/sponsors/Brooooooklyn"
+    }
+  },
+  "node_modules/@napi-rs/canvas-win32-x64-msvc": {
+    "version": "1.2.0",
+    "resolved": "https://registry.npmjs.org/@napi-rs/canvas-win32-x64-msvc/-/canvas-win32-x64-msvc-1.2.0.tgz",
+    "integrity": "sha512-GJ0DLyiTvLw5xNtdUJ0ncRuuT4Yv9zNXnrrvfvKr1/M08mbvtFVLoKiwQAaWixEcTsCh0U94/nMxkJTLH7ZMfw==",
+    "cpu": ["x64"],
+    "license": "MIT",
+    "optional": true,
+    "os": ["win32"],
+    "engines": {
+      "node": ">= 10"
+    },
+    "funding": {
+      "type": "github",
+      "url": "https://github.com/sponsors/Brooooooklyn"
+    }
+  },
+  "node_modules/@napi-rs/wasm-runtime": {
+    "version": "1.2.4",
+    "resolved": "https://registry.npmjs.org/@napi-rs/wasm-runtime/-/wasm-runtime-1.2.4.tgz",
+    "integrity": "sha512-AJxoUD2/15ESHbvpcyjU274nsAPLuOtPHCk0vKJM5pj//Fg/B1FXNWjPnXTT9PymCYYiHo4zPj0ZomXBKhoy7g==",
+    "dev": true,
+    "license": "MIT",
+    "dependencies": {
+      "@tybys/wasm-util": "^0.10.3"
+    },
+    "engines": {
+      "node": "^20.19.0 || ^22.13.0 || >=23.5.0"
+    },
+    "funding": {
+      "type": "github",
+      "url": "https://github.com/sponsors/Brooooooklyn"
+    },
+    "peerDependencies": {
+      "@emnapi/core": "^1.7.1 || ^2.0.0-alpha.4",
+      "@emnapi/runtime": "^1.7.1 || ^2.0.0-alpha.4"
+    }
+  },
+  "node_modules/@oslojs/encoding": {
+    "version": "1.1.0",
+    "resolved": "https://registry.npmjs.org/@oslojs/encoding/-/encoding-1.1.0.tgz",
+    "integrity": "sha512-70wQhgYmndg4GCPxPPxPGevRKqTIJ2Nh4OkiMWmDAVYsTQ+Ta7Sq+rPevXyXGdzr30/qZBnyOalCszoMxlyldQ==",
+    "license": "MIT"
+  },
+  "node_modules/@oxc-project/types": {
+    "version": "0.159.0",
+    "resolved": "https://registry.npmjs.org/@oxc-project/types/-/types-0.159.0.tgz",
+    "integrity": "sha512-QWjWhxheluOJ82kDHNyps00UvRpQCtI34B5A/SzpgQycUD/79FuvT4I0aQIfE/bdPwKmX4QPftnywFBH6FxJhQ==",
+    "license": "MIT",
+    "funding": {
+      "url": "https://github.com/sponsors/oxc-project"
+    }
+  }
+}

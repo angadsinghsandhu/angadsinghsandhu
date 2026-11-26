@@ -1,0 +1,34 @@
+---
+import EditorialList from "../../components/EditorialList.astro";
+import EditorialPage from "../../components/EditorialPage.astro";
+import { publishedProjects } from "../../content/catalog";
+import type { Project } from "../../content/editorial";
+
+export function getStaticPaths() {
+  return publishedProjects.map((project) => ({
+    params: { slug: project.slug },
+    props: { project },
+  }));
+}
+
+interface Props {
+  project: Project;
+}
+
+const { title, summary, body, links } = Astro.props.project;
+---
+
+<EditorialPage
+  title={title}
+  summary={summary}
+  parent={{ title: "Projects", href: "/projects/" }}
+>
+  {body.map((text) => (
+    <p>{text}</p>
+  ))}
+  {links.length > 0 && (
+    <EditorialList
+      entries={links.map(({ href, label }) => ({ href, title: label }))}
+    />
+  )}
+</EditorialPage>

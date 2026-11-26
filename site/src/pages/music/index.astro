@@ -1,0 +1,19 @@
+---
+import EditorialList from "../../components/EditorialList.astro";
+import EditorialPage from "../../components/EditorialPage.astro";
+import { publishedReleases } from "../../content/catalog";
+
+const entries = publishedReleases.map(({ slug, title, summary }) => ({
+  href: `/music/${slug}/`,
+  title,
+  summary,
+}));
+---
+
+<EditorialPage title="Music">
+  {entries.length ? (
+    <EditorialList entries={entries} />
+  ) : (
+    <p>No releases published yet.</p>
+  )}
+</EditorialPage>

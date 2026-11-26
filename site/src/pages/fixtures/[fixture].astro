@@ -1,0 +1,25 @@
+---
+import { useFixtures } from "../../content/catalog";
+
+export function getStaticPaths() {
+  return useFixtures ? [{ params: { fixture: "audio" } }] : [];
+}
+
+const { testTone } = await import("../../../tests/fixtures/editorial");
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Playback fixture</title>
+  </head>
+  <body>
+    <audio
+      controls
+      autoplay
+      aria-label="Fixture track"
+      src={testTone()}
+    ></audio>
+  </body>
+</html>

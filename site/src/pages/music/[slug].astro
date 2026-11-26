@@ -1,0 +1,167 @@
+---
+import MusicPlayer from "../../components/MusicPlayer.astro";
+import { publishedReleases } from "../../content/catalog";
+import type { MusicRelease } from "../../content/editorial";
+import SiteLayout from "../../layouts/SiteLayout.astro";
+
+export function getStaticPaths() {
+  return publishedReleases.map((release) => ({
+    params: { slug: release.slug },
+    props: { release },
+  }));
+}
+
+interface Props {
+  release: MusicRelease;
+}
+
+const { title, summary, cover, embedUrl, providers, tracks, credits } =
+  Astro.props.release;
+---
+
+<SiteLayout title={title} description={summary}>
+  <article class="record">
+    <header>
+      <a class="label" href="/music/">
+        Music
+      </a>
+      <h1>{title}</h1>
+      <p>{summary}</p>
+    </header>
+    <img src={cover.src} alt={cover.alt} width="600" height="600" />
+    <div class="playback">
+      <MusicPlayer {title} {embedUrl} />
+      {providers.length > 0 && (
+        <ul aria-label="Music providers" class="providers">
+          {providers.map(({ href, label }) => (
+            <li>
+              <a href={href}>{label}</a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+    <div class="credits">
+      <details open>
+        <summary>Tracks</summary>
+        <ol>
+          {tracks.map((track) => (
+            <li>{track}</li>
+          ))}
+        </ol>
+      </details>
+      <details>
+        <summary>Credits</summary>
+        <dl>
+          {credits.map(({ role, name }) => (
+            <>
+              <dt>{role}</dt>
+              <dd>{name}</dd>
+            </>
+          ))}
+        </dl>
+      </details>
+    </div>
+  </article>
+</SiteLayout>
+
+<style>
+  .record {
+    display: grid;
+    grid-template-areas:
+      "cover header"
+      "cover playback"
+      "cover credits";
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    grid-template-rows: auto auto 1fr;
+    align-items: start;
+    gap: 18px clamp(18px, 4vw, 52px);
+  }
+
+  header {
+    grid-area: header;
+  }
+
+  .label {
+    display: inline-flex;
+    min-height: var(--target);
+    align-items: center;
+  }
+
+  header p {
+    margin-block-start: 14px;
+  }
+
+  img {
+    display: block;
+    grid-area: cover;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    border: 1px solid var(--rule);
+    background: var(--graphite);
+    object-fit: cover;
+  }
+
+  .playback {
+    grid-area: playback;
+  }
+
+  .providers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 18px;
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .providers a {
+    display: inline-flex;
+    min-height: var(--target);
+    align-items: center;
+  }
+
+  .credits {
+    grid-area: credits;
+    border-block-start: 1px solid var(--rule);
+  }
+
+  details {
+    border-block-end: 1px solid var(--rule);
+  }
+
+  summary {
+    min-height: var(--target);
+    padding: 10px;
+  }
+
+  ol,
+  dl {
+    margin-block: 0 14px;
+    color: var(--muted);
+  }
+
+  dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 12px;
+    margin-inline: 12px;
+  }
+
+  dd {
+    margin: 0;
+  }
+
+  @media (max-width: 620px) {
+    .record {
+      grid-template-areas: "header" "cover" "playback" "credits";
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto;
+    }
+
+    img {
+      width: min(100%, 290px);
+    }
+  }
+</style>
