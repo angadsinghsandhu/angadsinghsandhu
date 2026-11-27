@@ -35,9 +35,9 @@ The required `Verify portfolio` job runs for opened, reopened and updated pull r
 
 A dispatch carries `repository`, `ref`, `sha` and numeric `runId` in `client_payload`. Source selection verifies GitHub's sender and target repository, checks that the workflow SHA is the current protected Portfolio `main` commit, and checks Notes workflow `379127533` and its required `verify` job for the same protected Notes commit. A Portfolio push discovers the eligible Notes run for the current approved Notes head. A dispatch supplies the run to check. The chooser records both source SHAs and the Notes run ID and attempt.
 
-The build uses clean, SHA-pinned checkouts. After standalone verification, it exports Notes into runner temporary storage, imports the export and receipt, builds with the approved origin, writes the [release marker](#hosted-release-identity), certifies the output, and runs the Chromium archive suite. The upload retains only `site/dist` as `portfolio-candidate-<run ID>-<attempt>`. The source-selection and candidate-build jobs have no hosting credentials. The separate publication job runs only after both succeed and the build exposes its validated receipt.
+The build uses clean, SHA-pinned checkouts. After standalone verification, it exports Notes into runner temporary storage, imports the export and receipt, builds with the approved origin, writes the [release marker](#hosted-release-identity), certifies the output, and runs the Chromium archive suite. A candidate with zero verified lessons uploads only `site/dist`. A candidate with verified lessons uploads the certified sibling `pages/` and `worker-assets/` directories. Both use `portfolio-candidate-<run ID>-<attempt>`. The source-selection and candidate-build jobs have no hosting credentials. The separate publication job runs only after both succeed and the build exposes its validated receipt.
 
-After upload, the build job rereads the validated production snapshot and checks GitHub artifact metadata with the job’s read-only Actions token. The check binds the artifact ID, archive SHA-256, repository, Portfolio revision and exact run-attempt name, and requires a current expiration. On success, the job exposes its separate JSON `release_receipt` output with the Portfolio and Notes SHAs, snapshot schema and manifest digest, run ID and attempt, artifact ID, and archive SHA-256. A failed check leaves the job without a receipt. The receipt stays outside the archive.
+After upload, the build job rereads the validated production snapshot and checks GitHub artifact metadata with the job’s read-only Actions token. The check binds the artifact ID, archive SHA-256, repository, Portfolio revision and exact run-attempt name, and requires a current expiration. On success, the job exposes its separate JSON `release_receipt` output with the Portfolio and Notes SHAs, snapshot schema and manifest digest, run ID and attempt, artifact ID, and archive SHA-256. A failed check leaves the job without a receipt. The receipt stays outside the archive. Paired receipts also carry the certified Pages digest, Worker digest, and trace package count. Receipt creation compares the exact artifact directories to the separate certification proof, and the publisher verifies both tree digests again after extraction.
 
 Production publication also requires the separate controls and host configuration below.
 
@@ -139,6 +139,14 @@ actionlint -ignore '^unexpected key "queue" for "concurrency" section\. expected
 cd site
 npx vitest run tests/release-workflow.test.ts tests/scripts/release-production.test.ts tests/scripts/release-smoke.test.ts
 ```
+
+## Publish verified practice lessons
+
+Keep `PORTFOLIO_PRODUCTION_TRACE_ENABLED` unset until the dedicated `portfolio-practice-traces` Worker serves its verified empty inventory at `/practice-traces/_catalog.json` on the canonical hostname. Use the exact route `angadsandhu.dev/practice-traces/*`, with alternate Worker URLs disabled. Put the account Workers Scripts Write token in the protected environment as `PORTFOLIO_PRODUCTION_TRACE_TOKEN`. The one-time route credential stays in local private storage and should be revoked after setup. The credential-free build and operator rollback read public trace proofs without this deploy token.
+
+For a paired release, the serialized publisher stages both checked trees, probes the currently served release, and builds an additive Worker version from the verified new and retained packages. It checks protected source eligibility and the live inventory before deploying the Worker. The Worker must serve the exact new inventory and package bytes before Pages deployment can begin. A timeout can only advance when a fresh canonical probe proves the complete result. Recheck both protected sources before activating Pages.
+
+Rollback verifies the known-good trace manifest and exact bytes on the canonical host before moving Pages traffic. The Worker retains all previously published content-addressed packages within its budgets. A release exceeding the budget stops before upload and requires a separate retention decision. The journal continues to identify the Pages deployment and retains the paired proof with the release receipt.
 
 ## Release checks
 

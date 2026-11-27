@@ -24,11 +24,14 @@ const accountId = "a".repeat(32);
 const token = "trace-token";
 const executable = process.execPath;
 
-async function fixture(onTestFinished: (fn: () => Promise<void>) => void) {
+async function fixture(
+  onTestFinished: (fn: () => Promise<void>) => void,
+  frames: number[] = [],
+) {
   const root = await mkdtemp(join(await realpath(tmpdir()), "trace-provider-"));
   onTestFinished(() => rm(root, { recursive: true }));
   const candidate = join(root, "candidate");
-  const bytes = Buffer.from('{"frames":[]}\n');
+  const bytes = Buffer.from(JSON.stringify({ frames }) + "\n");
   const sha = createHash("sha256").update(bytes).digest("hex");
   const asset = `practice-traces/${sha}.json`;
   await mkdir(join(candidate, "practice-traces"), { recursive: true });
@@ -191,4 +194,34 @@ it("does not confirm a success response when the expected catalog never arrives"
     await provider.ensure(f.candidate, f.proof, executable, async () => true),
   ).toBe(false);
   expect(exec).toHaveBeenCalledOnce();
+});
+
+it("refuses a stale staging catalog after an earlier active receipt probe succeeds", async ({
+  onTestFinished,
+}) => {
+  const active = await fixture(onTestFinished);
+  const candidate = await fixture(onTestFinished, [1]);
+  const provider = createReleaseTraceProvider({
+    origin,
+    accountId,
+    token,
+    fetch: active.fetch,
+    exec: active.exec,
+  });
+  const eligible = async () => true;
+  expect(
+    await provider.ensure(active.candidate, active.proof, executable, eligible),
+  ).toBe(true);
+  expect(await provider.probe(active.proof)).toBe(true);
+  active.published.set(traceCatalogPath, Buffer.from(emptyTraceCatalog));
+  expect(
+    await provider.ensure(
+      candidate.candidate,
+      candidate.proof,
+      executable,
+      eligible,
+      active.proof,
+    ),
+  ).toBe(false);
+  expect(active.exec).toHaveBeenCalledOnce();
 });

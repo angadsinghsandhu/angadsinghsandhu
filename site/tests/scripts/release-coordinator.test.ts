@@ -410,7 +410,7 @@ it("leaves Pages and its journal alone after an unproved Worker activation", asy
 });
 it("requires retained packages before rolling back to a paired Pages deployment", async () => {
   const f = fixture();
-  f.history.get(1)!.receipt = { ...f.history.get(1)!.receipt, practice };
+  Object.assign(f.history.get(1)!.receipt, { practice });
   const gate = {
     ...f.gate,
     practice: { ensure: async () => true, probe: async () => false },

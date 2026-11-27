@@ -18,6 +18,9 @@ import {
 } from "./fixtures/notes-preview";
 
 const archive = process.env.PORTFOLIO_NOTES_BROWSER === "archive";
+const verified: number[] = JSON.parse(
+  process.env.PORTFOLIO_NOTES_TEST_VERIFIED_IDS ?? "[]",
+);
 const book = "/notes/books/programming-pytorch-for-deep-learning-ian-pointer/";
 const chapter = `${book}chapter-1-getting-started-with-pytorch/`;
 const folder =
@@ -48,7 +51,7 @@ test("Interview links to available approved study paths or the library", async (
   }
 });
 
-test("interview leads to the curriculum indexes without linking draft lessons", async ({
+test("interview leads to the curriculum indexes with only verified lesson links", async ({
   page,
 }) => {
   await page.goto("/interview/");
@@ -58,9 +61,20 @@ test("interview leads to the curriculum indexes without linking draft lessons", 
   await expect(
     page.getByRole("heading", { name: "LeetCode practice" }),
   ).toBeVisible();
-  await expect(
-    page.getByText("No verified LeetCode lessons are available yet."),
-  ).toBeVisible();
+  if (verified.length) {
+    const links = page
+      .getByRole("list", { name: "Matching lessons" })
+      .getByRole("link");
+    expect(
+      await links.evaluateAll((items) =>
+        items.map((item) => item.getAttribute("href")),
+      ),
+    ).toEqual(verified.map((id) => `/practice/leetcode/${id}/`));
+  } else {
+    await expect(
+      page.getByText("No verified LeetCode lessons are available yet."),
+    ).toBeVisible();
+  }
   await page.getByRole("link", { name: "Study paths", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Study paths", exact: true }),
@@ -71,11 +85,16 @@ test("draft curriculum and malformed reader routes are absent", async ({
   request,
 }) => {
   for (const route of [
-    "/practice/leetcode/1/",
+    ...(verified.includes(1) ? [] : ["/practice/leetcode/1/"]),
+    "/practice/leetcode/2001/",
     "/practice/paths/not-a-study-path/",
     "/notes/not-a-notes-entry/",
   ])
     expect((await request.get(route)).status(), route).toBe(404);
+  for (const id of verified) {
+    const route = `/practice/leetcode/${id}/`;
+    expect((await request.get(route)).status(), route).toBe(200);
+  }
 });
 
 test("isolated preview rebuild adds, edits, renames, and removes reader output", async ({

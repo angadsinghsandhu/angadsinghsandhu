@@ -247,7 +247,7 @@ it("exposes the separate receipt only after the immutable archive upload", () =>
   );
   expect(workflow).toMatch(/\n {2}build:[\s\S]*?\n {6}actions: read\n/);
   expect(workflow).toMatch(
-    /path: site\/dist\n[\s\S]*\n {8}id: receipt\n[\s\S]*\n {8}run: node scripts\/release-artifact-proof\.ts\n/,
+    /path: \$\{\{ steps\.verify\.outputs\.artifact_path \}\}\n[\s\S]*\n {8}id: receipt\n[\s\S]*\n {8}run: node scripts\/release-artifact-proof\.ts\n/,
   );
   expect(workflow).toContain("PORTFOLIO_ARTIFACT_TOKEN: ${{ github.token }}");
   expect(workflow).toContain(

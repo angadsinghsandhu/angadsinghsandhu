@@ -58,6 +58,7 @@ export type ReleaseCoordinatorGate = Parameters<
       proof: Practice,
       executable: string,
       stillEligible: () => Promise<boolean>,
+      activeProof?: Practice,
     ) => Promise<boolean>;
   };
   fetchMarker?: typeof fetch;
@@ -282,6 +283,7 @@ async function release(
               return false;
             return (await evidence()).decision === "publish";
           },
+          active?.receipt.practice,
         ))
       )
         return deny("Could not prove the trace Worker activation");

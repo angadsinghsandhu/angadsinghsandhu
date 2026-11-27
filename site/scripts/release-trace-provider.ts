@@ -158,6 +158,7 @@ export function createReleaseTraceProvider({
       proof: PracticeBundleProof,
       wranglerExecutable: string,
       stillEligible: () => Promise<boolean>,
+      activeProof?: PracticeBundleProof,
     ): Promise<boolean> {
       if (!token || !/^[!-~]+(?![\s\S])/u.test(token)) return false;
 
@@ -176,14 +177,16 @@ export function createReleaseTraceProvider({
         try {
           const read = createReader(origin, request);
           const initial = await read(traceCatalogPath, catalogLimit);
+          const readBaseline = (path: string, maximumBytes: number) =>
+            path === traceCatalogPath
+              ? Promise.resolve(initial)
+              : read(path, maximumBytes);
+          if (activeProof) await probeTraceBundle(activeProof, readBaseline);
           const desired = await stageTraceInventory(
             workerDirectory,
             proof,
             join(cwd, "assets"),
-            (path, maximumBytes) =>
-              path === traceCatalogPath
-                ? Promise.resolve(initial)
-                : read(path, maximumBytes),
+            readBaseline,
           );
 
           if (!initial.equals(desired)) {
