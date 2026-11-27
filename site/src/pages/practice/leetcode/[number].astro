@@ -1,0 +1,23 @@
+---
+import LessonReader from "../../../components/practice/LessonReader.astro";
+import SiteLayout from "../../../layouts/SiteLayout.astro";
+import { readPreparedNotesManifest } from "../../../lib/notes-catalog";
+import {
+  createPracticeLessonPaths,
+  type PracticeLessonProps,
+} from "../../../lib/practice-lessons";
+
+export async function getStaticPaths() {
+  return createPracticeLessonPaths(await readPreparedNotesManifest());
+}
+
+type Props = PracticeLessonProps;
+const { problem } = Astro.props;
+---
+
+<SiteLayout
+  title={`${problem.number}. ${problem.title}`}
+  description={`Study ${problem.title} with worked examples and complete execution transcripts.`}
+>
+  <LessonReader {...Astro.props} />
+</SiteLayout>

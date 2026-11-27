@@ -110,13 +110,17 @@ export function createNotesCatalog(manifest?: PortfolioSnapshotV1) {
   };
 }
 
-let prepared: Promise<ReturnType<typeof createNotesCatalog>> | undefined;
+let preparedManifest: Promise<PortfolioSnapshotV1 | undefined> | undefined;
+let preparedCatalog: Promise<ReturnType<typeof createNotesCatalog>> | undefined;
+
+export function readPreparedNotesManifest() {
+  const receipt = process.env.PORTFOLIO_NOTES_BUILD_RECEIPT;
+  return (preparedManifest ??= receipt
+    ? readPinnedNotesManifest(resolve(notesSnapshotDirectory), receipt)
+    : Promise.resolve(undefined));
+}
 
 export function readPreparedCatalog() {
-  const receipt = process.env.PORTFOLIO_NOTES_BUILD_RECEIPT;
-  return (prepared ??= receipt
-    ? readPinnedNotesManifest(resolve(notesSnapshotDirectory), receipt).then(
-        createNotesCatalog,
-      )
-    : Promise.resolve(createNotesCatalog()));
+  return (preparedCatalog ??=
+    readPreparedNotesManifest().then(createNotesCatalog));
 }

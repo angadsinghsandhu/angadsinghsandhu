@@ -26,14 +26,18 @@ import { renderNotesRedirects, renderSitemap } from "./notes-redirects.ts";
 const maximumFiles = 20_000;
 const maximumBytes = 25 * 1024 * 1024;
 const privatePath =
-  /(?:^\/(?:worker-assets|practice-traces|drafts?|fixtures?|private|account|api|progress|practice|functions|_worker\.js)|(?:^|\/)(?:\.[^/]+|manifest\.json|current\.json|[^/]*receipt\.json))(?:\/|$)/iu;
+  /(?:^\/(?:worker-assets|practice-traces|drafts?|fixtures?|private|account|api|progress|functions|_worker\.js)|(?:^|\/)(?:\.[^/]+|manifest\.json|current\.json|[^/]*receipt\.json))(?:\/|$)/iu;
 
-export function readOutput(directory: string) {
+export function readOutput(directory: string, curriculum = false) {
   const files = new Map<string, number>();
   function walk(path: string) {
     const absolute = join(directory, path);
     const stat = lstatSync(absolute);
-    if (privatePath.test(path)) throw new Error(`Private output path: ${path}`);
+    if (
+      privatePath.test(path) ||
+      (!curriculum && /^\/practice(?:\/|$)/iu.test(path))
+    )
+      throw new Error(`Private output path: ${path}`);
     if (stat.isDirectory()) {
       for (const name of readdirSync(absolute).sort()) walk(`${path}/${name}`);
       return;
@@ -118,7 +122,10 @@ export function releaseInventory(snapshot: NotesSnapshot, origin: string) {
 
   for (const asset of snapshot.pagesAssets)
     publicAssets.set(asset.publicPath, asset.file);
-  if (snapshot.manifest.entries.length)
+  if (
+    snapshot.manifest.entries.length ||
+    snapshot.manifest.curriculum.lessons.length
+  )
     for (const { source, output } of notesLicenseFiles)
       publicAssets.set("/" + output, resolve("node_modules", source));
 
@@ -136,11 +143,14 @@ export function reportOutput(files: ReadonlyMap<string, number>) {
   console.log(JSON.stringify({ files: files.size, bytes, largest }, null, 2));
 }
 
-const searchInventoryPath = ".generated/pages-search-inventory.json";
+const searchInventoryPath = (receipt: NotesSnapshot["receipt"]) =>
+  receipt.mode === "preview"
+    ? `.generated/pages-search-preview-${receipt.manifestSha256}.json`
+    : ".generated/pages-search-inventory.json";
 const pagefindBundle =
   /^\/pagefind\/(?:pagefind(?:-entry\.json|-worker\.js|\.js|\.[\w-]+\.pf_meta)|wasm\.[\w-]+\.pagefind|(?:fragment\/[\w-]+\.pf_fragment|index\/[\w-]+\.pf_index|filter\/[\w-]+\.pf_filter))$/u;
 const searchInventory = z.strictObject({
-  mode: z.literal("production"),
+  mode: z.enum(["production", "preview"]),
   sourceSha: z.string(),
   manifestSha256: z.string(),
   origin: z.string(),
@@ -162,18 +172,17 @@ export function writeSearchInventory(
   origin: string,
 ) {
   const files = Object.fromEntries(
-    [...readOutput(directory).keys()]
+    [...readOutput(directory, receipt.mode === "preview").keys()]
       .filter(isPagefind)
       .map((path) => [path, fileDigest(directory, path)]),
   );
   const value = searchInventory.parse({ ...receipt, origin, files });
-  const stage = mkdtempSync(
-    join(dirname(searchInventoryPath), ".search-inventory-"),
-  );
+  const path = searchInventoryPath(receipt);
+  const stage = mkdtempSync(join(dirname(path), ".search-inventory-"));
   try {
     const staged = join(stage, "receipt.json");
     writeFileSync(staged, JSON.stringify(value) + "\n", { flag: "wx" });
-    renameSync(staged, searchInventoryPath);
+    renameSync(staged, path);
   } finally {
     rmSync(stage, { recursive: true, force: true });
   }
@@ -186,7 +195,7 @@ export function verifySearchInventory(
   origin: string,
 ) {
   const inventory = searchInventory.parse(
-    JSON.parse(readFileSync(searchInventoryPath, "utf8")),
+    JSON.parse(readFileSync(searchInventoryPath(receipt), "utf8")),
   );
   if (
     inventory.mode !== receipt.mode ||

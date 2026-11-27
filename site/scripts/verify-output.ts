@@ -19,6 +19,7 @@ import {
 } from "./release-build-marker.ts";
 import {
   notesSnapshotDirectory,
+  readNotesSnapshot,
   readProductionNotesSnapshot,
 } from "../src/lib/notes-snapshot.ts";
 
@@ -208,8 +209,12 @@ function checkGeneratedLines(path: string, bytes: Buffer) {
     throw new Error(`Generated text exceeds 500 physical lines: ${path}`);
 }
 
-async function certify(directory: string, requireMarker: boolean) {
-  const files = readOutput(directory);
+async function certify(
+  directory: string,
+  requireMarker: boolean,
+  previewSha?: string,
+) {
+  const files = readOutput(directory, !!previewSha);
   const markerPath = "/" + releaseMarkerPath;
   if (requireMarker && !files.has(markerPath))
     throw new Error(`Missing public file: ${markerPath}`);
@@ -218,9 +223,12 @@ async function certify(directory: string, requireMarker: boolean) {
   reportOutput(files);
   const parsedOrigin = outputOrigin(process.env.PORTFOLIO_ORIGIN);
   const pages = readPages(directory, files, parsedOrigin);
-  const snapshot = await readProductionNotesSnapshot(
-    resolve(notesSnapshotDirectory),
-  );
+  const staged = resolve(notesSnapshotDirectory);
+  const snapshot = previewSha
+    ? await readNotesSnapshot(staged, previewSha)
+    : await readProductionNotesSnapshot(staged);
+  if (previewSha && snapshot.receipt.mode !== "preview")
+    throw new Error("Curriculum preview requires a preview snapshot");
   if (requireMarker) {
     const marker = releaseMarkerFromEnvironment(process.env);
     if (marker.notesSha !== snapshot.receipt.sourceSha)
@@ -229,8 +237,10 @@ async function certify(directory: string, requireMarker: boolean) {
       );
     await verifyReleaseMarker(directory, marker);
   }
-  if (snapshot.manifest.verifiedCurriculumIds.length)
-    throw new Error("The Pages build does not yet render verified curriculum");
+  if (!previewSha && snapshot.manifest.verifiedCurriculumIds.length)
+    throw new Error(
+      "Curriculum release requires checked Worker asset deployment",
+    );
   const expected = releaseInventory(snapshot, parsedOrigin);
   const missing = [...expected.canonical.keys()].filter(
     (path) => !pages.has(path),
@@ -313,7 +323,10 @@ async function certify(directory: string, requireMarker: boolean) {
   if (requireMarker) required.add(markerPath);
   for (const path of required)
     if (!files.has(path)) throw new Error(`Missing public file: ${path}`);
-  const indexed = new Set(snapshot.manifest.entries.map(({ route }) => route));
+  const indexed = new Set([
+    ...snapshot.manifest.entries.map(({ route }) => route),
+    ...snapshot.manifest.curriculum.lessons.map(({ route }) => route),
+  ]);
   if (!indexed.size && searchFiles.size)
     throw new Error("Pagefind assets are present with no indexed entries");
   for (const path of files.keys()) {
@@ -358,17 +371,20 @@ async function certify(directory: string, requireMarker: boolean) {
 }
 
 try {
-  const [flag, directory, marker, ...extra] = process.argv.slice(2);
+  const [flag, directory, mode, ...extra] = process.argv.slice(2);
+  const previewSha = /^--preview-revision=([a-f0-9]{40}|[a-f0-9]{64})$/u.exec(
+    mode ?? "",
+  )?.[1];
   if (
     flag !== "--dir" ||
     !directory ||
-    (marker !== undefined && marker !== "--release-marker") ||
+    (mode !== undefined && mode !== "--release-marker" && !previewSha) ||
     extra.length
   )
     throw new Error(
-      "Usage: npm run verify:output -- --dir dist [--release-marker]",
+      "Usage: npm run verify:output -- --dir <dir> [--release-marker | --preview-revision=<sha>]",
     );
-  await certify(resolve(directory), marker === "--release-marker");
+  await certify(resolve(directory), mode === "--release-marker", previewSha);
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;

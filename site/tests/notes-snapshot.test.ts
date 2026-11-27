@@ -646,6 +646,10 @@ it("publishes only Pages inventory from a verified production snapshot", async (
   const paths = await workspace(onTestFinished);
   const manifest = fixtureWithAssets();
   manifest.mode = "production";
+  manifest.verifiedCurriculumIds = [];
+  manifest.curriculum.problems = [];
+  manifest.curriculum.lessons = [];
+  manifest.curriculum.traceAssets = [];
   await writeArtifact(paths, manifest);
   expect(importArtifact(paths).stderr).toBe("");
   const result = await runRelease(paths.root);
@@ -681,4 +685,22 @@ it("publishes only Pages inventory from a verified production snapshot", async (
   expect(
     await readFile(join(output, "content-assets", `${pagesHash}.pdf`)),
   ).toEqual(pagesBytes);
+});
+
+it("denies production lessons until their checked Worker assets can be deployed", async ({
+  onTestFinished,
+}) => {
+  const paths = await workspace(onTestFinished);
+  const manifest = fixtureWithAssets();
+  manifest.mode = "production";
+  await writeArtifact(paths, manifest);
+  expect(importArtifact(paths).stderr).toBe("");
+  const result = await runRelease(paths.root);
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain(
+    "Curriculum release requires checked Worker asset deployment",
+  );
+  await expect(stat(join(paths.root, "dist"))).rejects.toMatchObject({
+    code: "ENOENT",
+  });
 });
