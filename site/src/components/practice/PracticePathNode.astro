@@ -1,0 +1,58 @@
+---
+import type { PracticeStudyPath } from "../../lib/practice-discovery";
+interface Props {
+  path: PracticeStudyPath;
+  id: string;
+  parentId?: string;
+}
+const { path, id, parentId } = Astro.props;
+const node = path.nodes.get(id)!;
+const repeated = path.firstParent.get(id) !== parentId;
+const href = `#path-node-${id}`;
+---
+
+<li
+  id={repeated ? undefined : `path-node-${id}`}
+  data-problem-id={node.target?.id}
+>
+  {repeated ? (
+    <a href={href}>{node.label} (see first appearance)</a>
+  ) : (
+    <>
+      {node.target &&
+        (node.target.route ? (
+          <a href={node.target.route}>
+            {node.target.number}. {node.label}
+          </a>
+        ) : (
+          <span>
+            {node.target.number}. {node.label} <small>Pending</small>
+          </span>
+        ))}
+      {(node.kind === "stage" || node.childIds.length > 0) && (
+        <details>
+          <summary>
+            {node.kind === "stage" ? node.label : "Related targets"}
+          </summary>
+          {node.childIds.length > 0 && (
+            <ul>
+              {node.childIds.map((child) => (
+                <Astro.self {path} id={child} parentId={id} />
+              ))}
+            </ul>
+          )}
+        </details>
+      )}
+    </>
+  )}
+</li>
+
+<style>
+  li {
+    margin-block: 0.3rem;
+  }
+
+  small {
+    color: var(--muted);
+  }
+</style>

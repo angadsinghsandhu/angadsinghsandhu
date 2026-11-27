@@ -17,6 +17,7 @@ interface Props {
   assetBytes?: number;
   html: string;
   navItems?: ContentEntry[];
+  practice?: { title: string; route: string };
   previous?: ContentEntry;
   next?: ContentEntry;
 }
@@ -26,6 +27,7 @@ const {
   html,
   navItems = [],
   previous,
+  practice,
   next,
   organization,
 } = Astro.props;
@@ -130,6 +132,13 @@ const followsExternalAsset =
               metadata={organization}
               description={entry.description}
             />
+          )}
+          {practice && (
+            <div class="actions" data-pagefind-ignore>
+              <a class="action" href={practice.route}>
+                Practice {practice.title}
+              </a>
+            </div>
           )}
           {entry.sourceUrl && !followsExternalAsset && (
             <div class="actions" data-pagefind-ignore>

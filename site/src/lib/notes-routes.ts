@@ -17,6 +17,8 @@ const libraryPages = [
   "/library/collections/",
   "/library/paths/",
   "/search/",
+  "/practice/leetcode/",
+  "/practice/paths/",
 ];
 const reserved = [
   "/practice/leetcode",
@@ -118,6 +120,8 @@ export function claimNotesRoutes(
   );
   for (const route of organization.routes())
     page(route, `Organization ${route}`);
+  for (const path of manifest.curriculum.paths)
+    page(`/practice/paths/${path.id}/`, `Practice path ${path.id}`);
   for (const { problemId, route } of manifest.curriculum.lessons)
     page(route, `Practice lesson ${problemId}`);
   for (const entry of manifest.entries) {

@@ -27,6 +27,7 @@ export type ReaderProps = {
   organization: ReaderOrganization;
   navItems: ContentEntry[];
   assetBytes?: number;
+  practice?: { title: string; route: string };
   previous?: ContentEntry;
   next?: ContentEntry;
 };
@@ -59,6 +60,27 @@ export function createNotesCatalog(manifest?: PortfolioSnapshotV1) {
   );
   const folderKey = (entry: ContentEntry) =>
     folderRoute(entry.section, entry.groupSegments);
+  const practiceBySource = new Map<
+    string,
+    NonNullable<ReaderProps["practice"]>
+  >();
+  if (manifest) {
+    const verified = new Set(manifest.verifiedCurriculumIds);
+    const problems = new Map(
+      manifest.curriculum.problems
+        .filter(({ number }) => verified.has(number))
+        .map((problem) => [problem.id, problem]),
+    );
+    for (const { sourceRoute, problemId, lessonRoute } of manifest.curriculum
+      .sourceVariants) {
+      const problem = problems.get(problemId);
+      if (problem)
+        practiceBySource.set(sourceRoute, {
+          title: `${problem.number}. ${problem.title}`,
+          route: lessonRoute,
+        });
+    }
+  }
   const neighbors = new Map<string, ContentEntry[]>();
   const noteBuckets = new Map<string, ContentEntry[]>();
   for (const entry of entries.filter(isReaderNote)) {
@@ -92,11 +114,13 @@ export function createNotesCatalog(manifest?: PortfolioSnapshotV1) {
           const previous = navItems[current - 1];
           const next = current >= 0 ? navItems[current + 1] : undefined;
           const assetBytes = assetSizes.get(entry.assetUrl ?? "");
+          const practice = practiceBySource.get(entry.route);
           const props: ReaderProps = {
             entry,
             organization: readerOrganization(organization, entry),
             html: entry.bodyHtml ?? "",
             navItems,
+            ...(practice ? { practice } : {}),
             ...(assetBytes !== undefined ? { assetBytes } : {}),
             ...(previous ? { previous } : {}),
             ...(next ? { next } : {}),

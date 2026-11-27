@@ -98,3 +98,16 @@ it("claims the manifest's eligible numeric lesson route exactly once", () => {
     ),
   ).toThrow(/route collision/u);
 });
+
+it("claims the discovery indexes and reserves their namespaces from Notes aliases", () => {
+  const data = snapshot();
+  expect([
+    ...claimNotesRoutes({ manifest: data }, existing).pages.keys(),
+  ]).toEqual(
+    expect.arrayContaining(["/practice/leetcode/", "/practice/paths/"]),
+  );
+  data.entries[0]!.aliases = ["/practice/paths/legacy/"];
+  expect(() => claimNotesRoutes({ manifest: data }, existing)).toThrow(
+    /reserved/,
+  );
+});

@@ -1,0 +1,25 @@
+---
+import PracticePath from "../../../components/practice/PracticePath.astro";
+import SiteLayout from "../../../layouts/SiteLayout.astro";
+import {
+  readPreparedPracticeDiscovery,
+  type PracticeStudyPath,
+} from "../../../lib/practice-discovery";
+
+export async function getStaticPaths() {
+  const { paths } = await readPreparedPracticeDiscovery();
+  return paths.map((path) => ({
+    params: { slug: path.id },
+    props: { path },
+  }));
+}
+
+interface Props {
+  path: PracticeStudyPath;
+}
+const { path } = Astro.props;
+---
+
+<SiteLayout title={path.title} description={path.description}>
+  <PracticePath {path} />
+</SiteLayout>
