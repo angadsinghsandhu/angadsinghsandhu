@@ -82,6 +82,51 @@ it("binds the same-workflow receipt to the protected context and exact Notes att
   });
 });
 
+it("validates paired receipt metadata without attempting hosted publication", async () => {
+  const practice = {
+    pagesSha256: "a".repeat(64),
+    workerSha256: "b".repeat(64),
+    workerFiles: 1,
+  };
+  const env = {
+    ...candidate,
+    PORTFOLIO_SELECTED_RECEIPT: JSON.stringify({ ...receipt, practice }),
+  };
+  expect(productionInput(env, event).request).toMatchObject({
+    verified: { receipt: { practice } },
+  });
+  const sourceHttp = vi.fn<typeof fetch>();
+  const coordinate = vi.fn<typeof coordinateRelease>();
+  await expect(
+    runProductionRelease(env, event, { coordinate, sourceHttp }),
+  ).rejects.toThrow(/Worker activation/);
+  expect(sourceHttp).not.toHaveBeenCalled();
+  expect(coordinate).not.toHaveBeenCalled();
+});
+
+it.each([
+  { workerFiles: 0 },
+  { workerFiles: 20_001 },
+  { workerSha256: "invalid" },
+  { extra: 1 },
+])("rejects invalid paired release proof %j", (changed) => {
+  const practice = {
+    pagesSha256: "a".repeat(64),
+    workerSha256: "b".repeat(64),
+    workerFiles: 1,
+    ...changed,
+  };
+  expect(() =>
+    productionInput(
+      {
+        ...candidate,
+        PORTFOLIO_SELECTED_RECEIPT: JSON.stringify({ ...receipt, practice }),
+      },
+      event,
+    ),
+  ).toThrow();
+});
+
 it.each([
   ["PORTFOLIO_PRODUCTION_ENABLED", "TRUE"],
   ["GITHUB_ACTIONS", "false"],
@@ -231,6 +276,46 @@ it("feeds the verified receipt into the coordinator and distinguishes recovered 
     "proveFirstCutoverFailure",
   );
   expect(sourceHttp).toHaveBeenCalledTimes(3);
+});
+
+it("only configures paired publication after opt-in with a separate Worker token", async () => {
+  const practice = {
+    pagesSha256: "a".repeat(64),
+    workerSha256: "b".repeat(64),
+    workerFiles: 14,
+  };
+  const env = {
+    ...candidate,
+    ...credentials,
+    PORTFOLIO_SELECTED_RECEIPT: JSON.stringify({ ...receipt, practice }),
+    PORTFOLIO_PRODUCTION_TRACE_ENABLED: "true",
+  };
+  const sourceHttp = protectedHead();
+  const coordinate = vi
+    .fn()
+    .mockResolvedValue({ decision: "confirmed", operationId: 5 });
+  await expect(
+    runProductionRelease(env, event, { coordinate, sourceHttp }),
+  ).rejects.toThrow(/Worker activation/);
+  expect(sourceHttp).not.toHaveBeenCalled();
+  await expect(
+    runProductionRelease(
+      {
+        ...env,
+        PORTFOLIO_PRODUCTION_TRACE_TOKEN: "fixture-worker",
+      },
+      event,
+      { coordinate, sourceHttp },
+    ),
+  ).resolves.toMatchObject({ exitCode: 0, decision: "confirmed" });
+  expect(coordinate).toHaveBeenCalledWith(
+    expect.objectContaining({
+      verified: expect.objectContaining({ receipt: { ...receipt, practice } }),
+    }),
+    expect.objectContaining({
+      practice: { ensure: expect.any(Function), probe: expect.any(Function) },
+    }),
+  );
 });
 
 it.each([

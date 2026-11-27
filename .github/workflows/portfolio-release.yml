@@ -89,6 +89,7 @@ jobs:
       - run: npm ci
         working-directory: site/.generated/notes-checkout/site
       - name: Verify combined Portfolio and Notes
+        id: verify
         env:
           PORTFOLIO_SHA: ${{ needs.select.outputs.portfolio_sha }}
           NOTES_REVISION: ${{ needs.select.outputs.notes_sha }}
@@ -101,15 +102,27 @@ jobs:
             ./node_modules/.bin/tsx scripts/export-portfolio.ts --out "$staging/export" --revision "$NOTES_REVISION" > "$staging/receipt.json"
           )
           npm run import:notes -- --from "$staging/export" --receipt "$staging/receipt.json" --revision "$NOTES_REVISION"
-          npm run build:release
-          node scripts/release-build-marker.ts
-          npm run verify:output -- --dir dist --release-marker
+          PORTFOLIO_NOTES_TEST_VERIFIED_IDS="$(jq -c '.verifiedCurriculumIds' "$staging/export/manifest.json")"
+          export PORTFOLIO_NOTES_TEST_VERIFIED_IDS
+          if [ "$PORTFOLIO_NOTES_TEST_VERIFIED_IDS" = '[]' ]; then
+            npm run build:release
+            node scripts/release-build-marker.ts
+            npm run verify:output -- --dir dist --release-marker
+            echo 'artifact_path=site/dist' >> "$GITHUB_OUTPUT"
+          else
+            npm run build:release -- --paired | tee "$staging/build.log"
+            bundle="$(tail -n 1 "$staging/build.log" | jq -er '.practiceRelease')"
+            node scripts/release-build-marker.ts --dir "$bundle/pages"
+            npm run verify:output -- --dir "$bundle" --paired-release
+            printf 'artifact_path=%s\npractice_bundle=%s\n' "$bundle" "$bundle" >> "$GITHUB_OUTPUT"
+            export PORTFOLIO_PAIRED_PREVIEW_DIR="$bundle/pages"
+          fi
           npm run test:browser
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         id: candidate
         with:
           name: portfolio-candidate-${{ github.run_id }}-${{ github.run_attempt }}
-          path: site/dist
+          path: ${{ steps.verify.outputs.artifact_path }}
           if-no-files-found: error
           include-hidden-files: true
       - name: Bind release receipt to the uploaded artifact
@@ -117,6 +130,7 @@ jobs:
         env:
           PORTFOLIO_SHA: ${{ needs.select.outputs.portfolio_sha }}
           NOTES_REVISION: ${{ needs.select.outputs.notes_sha }}
+          CANDIDATE_PRACTICE_BUNDLE: ${{ steps.verify.outputs.practice_bundle }}
           CANDIDATE_ARTIFACT_ID: ${{ steps.candidate.outputs.artifact-id }}
           CANDIDATE_ARTIFACT_DIGEST: ${{ steps.candidate.outputs.artifact-digest }}
           PORTFOLIO_ARTIFACT_TOKEN: ${{ github.token }}
@@ -196,6 +210,8 @@ jobs:
           PORTFOLIO_PRODUCTION_ARTIFACT_TOKEN: ${{ github.token }}
           PORTFOLIO_PRODUCTION_JOURNAL_TOKEN: ${{ secrets.PORTFOLIO_PRODUCTION_JOURNAL_TOKEN }}
           PORTFOLIO_PRODUCTION_PAGES_TOKEN: ${{ secrets.PORTFOLIO_PRODUCTION_PAGES_TOKEN }}
+          PORTFOLIO_PRODUCTION_TRACE_ENABLED: ${{ vars.PORTFOLIO_PRODUCTION_TRACE_ENABLED }}
+          PORTFOLIO_PRODUCTION_TRACE_TOKEN: ${{ secrets.PORTFOLIO_PRODUCTION_TRACE_TOKEN }}
           PORTFOLIO_PRODUCTION_ACCOUNT_ID: ${{ vars.PORTFOLIO_PRODUCTION_ACCOUNT_ID }}
           PORTFOLIO_PRODUCTION_DATABASE_ID: ${{ vars.PORTFOLIO_PRODUCTION_DATABASE_ID }}
           PORTFOLIO_PRODUCTION_PROJECT: ${{ vars.PORTFOLIO_PRODUCTION_PROJECT }}

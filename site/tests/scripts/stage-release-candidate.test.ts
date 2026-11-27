@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+  mkdir,
   mkdtemp,
   readFile,
   readdir,
@@ -13,6 +14,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createReleaseStage } from "../../scripts/stage-release-candidate.ts";
+
+import { readPracticeBundleProof } from "../../scripts/verify-practice-bundle.ts";
 
 const origin = "https://portfolio.example";
 const receipt = {
@@ -115,15 +118,19 @@ it("passes a verified static tree from private scratch and preserves the callbac
   const { config, input } = fixture(archive(marker));
   const result = { accepted: true };
   await expect(
-    createReleaseStage(config)(input, async ({ directory, executable }) => {
-      expect(dirname(dirname(directory))).toBe(root);
-      expect((await stat(dirname(directory))).mode & 0o777).toBe(0o700);
-      expect(await readFile(join(directory, "index.html"), "utf8")).toBe(
-        "fixture index",
-      );
-      expect(executable).toBe(process.execPath);
-      return result;
-    }),
+    createReleaseStage(config)(
+      input,
+      async ({ directory, executable, workerDirectory }) => {
+        expect(workerDirectory).toBeUndefined();
+        expect(dirname(dirname(directory))).toBe(root);
+        expect((await stat(dirname(directory))).mode & 0o777).toBe(0o700);
+        expect(await readFile(join(directory, "index.html"), "utf8")).toBe(
+          "fixture index",
+        );
+        expect(executable).toBe(process.execPath);
+        return result;
+      },
+    ),
   ).resolves.toBe(result);
   expect(await readdir(root)).toEqual(["unrelated"]);
 });
@@ -163,4 +170,71 @@ it("removes private scratch when the callback rejects", async () => {
   ).rejects.toBe(failure);
   expect(await readFile(join(root, "unrelated"), "utf8")).toBe("keep");
   expect(await readdir(root)).toEqual(["unrelated"]);
+});
+
+it("passes only the exact paired Pages and Worker bytes in private directories", async () => {
+  const bytes = Buffer.from('{"steps":[]}\n');
+  const trace = createHash("sha256").update(bytes).digest("hex") + ".json";
+  const bundle = join(root, "bundle");
+  await mkdir(join(bundle, "pages"), { recursive: true });
+  await mkdir(join(bundle, "worker-assets", "practice-traces"), {
+    recursive: true,
+  });
+  await writeFile(join(bundle, "pages", "portfolio-release.json"), marker);
+  await writeFile(
+    join(bundle, "worker-assets", "practice-traces", trace),
+    bytes,
+  );
+  const practice = await readPracticeBundleProof(bundle);
+  const zip = execFileSync(
+    pythonExecutable,
+    [
+      "-c",
+      `
+import pathlib, sys, zipfile
+root = pathlib.Path(sys.argv[1])
+with zipfile.ZipFile(sys.stdout.buffer, "w") as output:
+    for file in root.rglob("*"):
+        if file.is_file():
+            output.write(file, file.relative_to(root).as_posix())
+`,
+      bundle,
+    ],
+    { timeout: 10_000 },
+  );
+  const { config, input } = fixture(zip);
+  const callback = vi.fn(
+    async ({
+      directory,
+      workerDirectory,
+    }: {
+      directory: string;
+      workerDirectory?: string;
+    }) => {
+      expect(
+        await readFile(join(directory, "portfolio-release.json"), "utf8"),
+      ).toBe(marker);
+      expect(
+        await readFile(join(workerDirectory!, "practice-traces", trace)),
+      ).toEqual(bytes);
+      expect((await stat(directory)).mode & 0o777).toBe(0o700);
+      expect((await stat(workerDirectory!)).mode & 0o777).toBe(0o700);
+    },
+  );
+  await createReleaseStage(config)({ ...input, practice }, callback);
+  expect(callback).toHaveBeenCalledOnce();
+
+  const rejected = vi.fn();
+  const retry = fixture(zip);
+  await expect(
+    createReleaseStage(retry.config)(
+      {
+        ...retry.input,
+        practice: { ...practice, workerSha256: "0".repeat(64) },
+      },
+      rejected,
+    ),
+  ).rejects.toThrow(/release proof/);
+  expect(rejected).not.toHaveBeenCalled();
+  expect(await readdir(root)).toEqual(["bundle", "unrelated"]);
 });

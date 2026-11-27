@@ -95,3 +95,12 @@ it("queues publication and operator work on the same protected target", () => {
   expect(operator).toContain("github.run_attempt == '1'");
   expect(operator).not.toContain("${{ inputs.");
 });
+
+it("supports a checked paired archive with the Worker credential only in publication", () => {
+  const [candidate, publish] = releases.split("\n  publish:\n");
+  expect(candidate).toMatch(
+    /--paired-release[\s\S]*upload-artifact@[\s\S]*CANDIDATE_PRACTICE_BUNDLE/,
+  );
+  expect(candidate).not.toContain("PORTFOLIO_PRODUCTION_TRACE_TOKEN");
+  expect(publish).toContain("secrets.PORTFOLIO_PRODUCTION_TRACE_TOKEN");
+});

@@ -132,5 +132,13 @@ export function releaseMarkerFromEnvironment(
 }
 
 if (import.meta.main) {
-  await writeReleaseMarker("dist", releaseMarkerFromEnvironment(process.env));
+  const [flag, directory, ...extra] = process.argv.slice(2);
+  if (flag && (flag !== "--dir" || !directory || extra.length))
+    throw new Error(
+      "Usage: node scripts/release-build-marker.ts [--dir <Pages directory>]",
+    );
+  await writeReleaseMarker(
+    directory ?? "dist",
+    releaseMarkerFromEnvironment(process.env),
+  );
 }

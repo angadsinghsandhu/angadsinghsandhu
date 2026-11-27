@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { releaseArtifactIdentity } from "./release-artifact-download.ts";
+import { practiceBundleProofSchema } from "./release-policy.ts";
 
 const id = z.number().int().positive();
 const uuid = z
@@ -15,6 +16,7 @@ const receipt = releaseArtifactIdentity
     notesSha: commit,
     snapshotSchema: id,
     manifestSha256: releaseArtifactIdentity.shape.archiveSha256,
+    practice: practiceBundleProofSchema.optional(),
   })
   .strict();
 const notesProof = z.strictObject({

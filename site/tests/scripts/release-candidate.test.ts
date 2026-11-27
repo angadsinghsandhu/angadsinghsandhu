@@ -283,7 +283,9 @@ it("gates the artifact on source selection and every verification step", () => {
   const upload = workflow.slice(
     workflow.indexOf("uses: actions/upload-artifact@"),
   );
-  expect(upload).toContain("path: site/dist\n");
+  expect(workflow).toContain("echo 'artifact_path=site/dist'");
+  expect(workflow).toContain("artifact_path=%s\\npractice_bundle=%s");
+  expect(upload).toContain("path: ${{ steps.verify.outputs.artifact_path }}\n");
   expect(upload).toContain("if-no-files-found: error\n");
   expect(upload).not.toMatch(/always\(\)|continue-on-error|overwrite: true/);
   expect(workflow).not.toMatch(

@@ -17,6 +17,8 @@ import {
   importNotesSnapshot,
   notesSnapshotDirectory,
 } from "../../src/lib/notes-snapshot.ts";
+import { readPracticeBundleProof } from "../../scripts/verify-practice-bundle.ts";
+import { portfolioSnapshotV1 } from "../../src/lib/notes-snapshot-v1.ts";
 import fixture from "../fixtures/notes-snapshot/manifest.v1.json" with { type: "json" };
 
 const upload = {
@@ -245,7 +247,7 @@ it("exposes the separate receipt only after the immutable archive upload", () =>
   );
   expect(workflow).toMatch(/\n {2}build:[\s\S]*?\n {6}actions: read\n/);
   expect(workflow).toMatch(
-    /path: site\/dist\n[\s\S]*\n {8}id: receipt\n[\s\S]*\n {8}run: node scripts\/release-artifact-proof\.ts\n/,
+    /path: \$\{\{ steps\.verify\.outputs\.artifact_path \}\}\n[\s\S]*\n {8}id: receipt\n[\s\S]*\n {8}run: node scripts\/release-artifact-proof\.ts\n/,
   );
   expect(workflow).toContain("PORTFOLIO_ARTIFACT_TOKEN: ${{ github.token }}");
   expect(workflow).toContain(
@@ -254,4 +256,106 @@ it("exposes the separate receipt only after the immutable archive upload", () =>
   expect(workflow).toContain(
     "CANDIDATE_ARTIFACT_DIGEST: ${{ steps.candidate.outputs.artifact-digest }}",
   );
+});
+
+it("rejects pairing an arbitrary trace bundle with a zero-lesson production snapshot", async () => {
+  const api = fakeGitHub(artifact);
+  await expect(
+    readReleaseArtifactProof(
+      upload,
+      join(directory, notesSnapshotDirectory),
+      api,
+      join(directory, "untrusted-pair"),
+    ),
+  ).rejects.toThrow(/paired artifact.*Notes snapshot/i);
+  expect(api.http).not.toHaveBeenCalled();
+});
+
+it("rejects a Pages-only mutation after the paired output was certified", async () => {
+  const workerBytes = '{"examples":[]}\n';
+  const digest = createHash("sha256").update(workerBytes).digest("hex");
+  const url = `/practice-traces/${digest}.json` as const;
+  const workerPath = `worker-assets${url}`;
+  const selected = portfolioSnapshotV1.parse({
+    ...fixture,
+    mode: "production",
+  });
+  selected.verifiedCurriculumIds = [1];
+  selected.curriculum.generation = "1".repeat(64);
+  selected.curriculum.problems.push({
+    id: "leetcode:1",
+    number: 1,
+    slug: "two-sum",
+    title: "Two Sum",
+    officialUrl: "https://leetcode.com/problems/two-sum/",
+    status: "verified",
+    domain: "algorithm",
+    topics: ["arrays"],
+    companies: [],
+    difficulty: "easy",
+    officialQuestionObservedOn: "2026-11-23",
+  });
+  const trace = {
+    url,
+    sha256: digest,
+    bytes: workerBytes.length,
+    exampleIds: ["example"],
+  };
+  selected.curriculum.lessons.push({
+    problemId: "leetcode:1",
+    route: "/practice/leetcode/1/",
+    status: "verified",
+    bodyHtml: "<p>Worked example.</p>",
+    headings: [],
+    approaches: [
+      {
+        id: "hash",
+        entryPoint: "solve",
+        title: "Hash table",
+        language: "python",
+        implementationSha256: "2".repeat(64),
+        codeHtml: "<pre>solve</pre>",
+        trace,
+        transcripts: [],
+      },
+    ],
+  });
+  selected.curriculum.traceAssets.push({
+    publicPath: url,
+    exportPath: workerPath,
+    bytes: trace.bytes,
+    sha256: digest,
+  });
+  const source = join(directory, "snapshot");
+  const manifest = JSON.stringify(selected);
+  const receiptPath = join(directory, "paired-snapshot.json");
+  writeFileSync(join(source, "manifest.json"), manifest);
+  writeFileSync(join(source, workerPath), workerBytes);
+  writeFileSync(
+    receiptPath,
+    JSON.stringify({
+      mode: "production",
+      sourceSha: upload.notesSha,
+      manifestSha256: createHash("sha256").update(manifest).digest("hex"),
+    }),
+  );
+  const store = join(directory, notesSnapshotDirectory);
+  await importNotesSnapshot(source, store, upload.notesSha, receiptPath);
+  const bundle = join(directory, "bundle");
+  mkdirSync(join(bundle, "pages"), { recursive: true });
+  mkdirSync(join(bundle, "worker-assets/practice-traces"), { recursive: true });
+  writeFileSync(join(bundle, "pages/index.html"), "<p>Checked bytes.</p>");
+  writeFileSync(join(bundle, workerPath), workerBytes);
+  const proof = await readPracticeBundleProof(bundle);
+  writeFileSync(bundle + ".proof.json", JSON.stringify(proof));
+
+  await expect(
+    readReleaseArtifactProof(upload, store, fakeGitHub(artifact), bundle),
+  ).resolves.toMatchObject({ practice: proof });
+  writeFileSync(join(bundle, "pages/index.html"), "<p>Different bytes.</p>");
+  const api = fakeGitHub(artifact);
+  await expect(
+    readReleaseArtifactProof(upload, store, api, bundle),
+  ).rejects.toThrow(/certified practice artifact/i);
+  expect(api.http).not.toHaveBeenCalled();
 });

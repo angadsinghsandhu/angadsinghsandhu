@@ -1,3 +1,7 @@
+import { z } from "zod";
+import { artifactMaxFiles } from "./stage-practice-traces.ts";
+import type { PracticeBundleProof } from "./verify-practice-bundle.ts";
+
 type Repository = {
   id: number;
   name: string;
@@ -68,6 +72,7 @@ export type ReleaseReceipt = CheckedArtifact & {
   notesSha: string;
   snapshotSchema: number;
   manifestSha256: string;
+  practice?: PracticeBundleProof;
 };
 
 export type ReleaseEvidence = {
@@ -88,6 +93,12 @@ type ReleaseResult = { decision: "publish" | "noop" } | Denial;
 
 const commitSha = /^[0-9a-f]{40}(?![\s\S])/u;
 const sha256 = /^[0-9a-f]{64}(?![\s\S])/u;
+
+export const practiceBundleProofSchema = z.strictObject({
+  pagesSha256: z.string().regex(sha256),
+  workerSha256: z.string().regex(sha256),
+  workerFiles: z.number().int().positive().max(artifactMaxFiles),
+});
 
 function positiveId(value: number): boolean {
   return Number.isSafeInteger(value) && value > 0;
@@ -208,6 +219,18 @@ function sameArtifact(
   );
 }
 
+function samePractice(
+  actual: PracticeBundleProof | undefined,
+  expected: PracticeBundleProof | undefined,
+): boolean {
+  if (!actual || !expected) return actual === expected;
+  return (
+    actual.pagesSha256 === expected.pagesSha256 &&
+    actual.workerSha256 === expected.workerSha256 &&
+    actual.workerFiles === expected.workerFiles
+  );
+}
+
 function sameReceipt(
   actual: ReleaseReceipt,
   expected: ReleaseReceipt,
@@ -216,7 +239,8 @@ function sameReceipt(
     samePair(actual, expected) &&
     sameArtifact(actual, expected) &&
     actual.snapshotSchema === expected.snapshotSchema &&
-    actual.manifestSha256 === expected.manifestSha256
+    actual.manifestSha256 === expected.manifestSha256 &&
+    samePractice(actual.practice, expected.practice)
   );
 }
 
@@ -229,7 +253,9 @@ function validReceipt(receipt: ReleaseReceipt): boolean {
     positiveId(receipt.runAttempt) &&
     positiveId(receipt.artifactId) &&
     sha256.test(receipt.manifestSha256) &&
-    sha256.test(receipt.archiveSha256)
+    sha256.test(receipt.archiveSha256) &&
+    (receipt.practice === undefined ||
+      practiceBundleProofSchema.safeParse(receipt.practice).success)
   );
 }
 

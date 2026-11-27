@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { fromHtml } from "hast-util-from-html";
@@ -10,6 +10,7 @@ import {
   reportOutput,
   verifySearchInventory,
 } from "./output-inventory.ts";
+import { readPracticeBundleForSnapshot } from "./verify-practice-bundle.ts";
 import { physicalLines } from "./output-text.ts";
 import { pdfAssets } from "./pdf-assets.ts";
 import {
@@ -213,8 +214,9 @@ async function certify(
   directory: string,
   requireMarker: boolean,
   previewSha?: string,
+  bundle?: string,
 ) {
-  const files = readOutput(directory, !!previewSha);
+  const files = readOutput(directory, !!previewSha || !!bundle);
   const markerPath = "/" + releaseMarkerPath;
   if (requireMarker && !files.has(markerPath))
     throw new Error(`Missing public file: ${markerPath}`);
@@ -237,7 +239,7 @@ async function certify(
       );
     await verifyReleaseMarker(directory, marker);
   }
-  if (!previewSha && snapshot.manifest.verifiedCurriculumIds.length)
+  if (!previewSha && !bundle && snapshot.manifest.verifiedCurriculumIds.length)
     throw new Error(
       "Curriculum release requires checked Worker asset deployment",
     );
@@ -365,6 +367,15 @@ async function certify(
     }
   }
   checkPagefind(directory, files, indexed);
+  if (bundle) {
+    const proof = await readPracticeBundleForSnapshot(
+      bundle,
+      snapshot.workerAssets,
+    );
+    const bytes = JSON.stringify(proof) + "\n";
+    writeFileSync(bundle + ".proof.json", bytes, { flag: "wx", mode: 0o600 });
+    console.log(JSON.stringify(proof));
+  }
   console.log(
     `Verified ${anchors} snapshot fragments, ${indexed.size} search results, and ${expected.publicAssets.size + pdf.size} bound assets.`,
   );
@@ -375,16 +386,26 @@ try {
   const previewSha = /^--preview-revision=([a-f0-9]{40}|[a-f0-9]{64})$/u.exec(
     mode ?? "",
   )?.[1];
+  const paired = mode === "--paired-release";
   if (
     flag !== "--dir" ||
     !directory ||
-    (mode !== undefined && mode !== "--release-marker" && !previewSha) ||
+    (mode !== undefined &&
+      mode !== "--release-marker" &&
+      !previewSha &&
+      !paired) ||
     extra.length
   )
     throw new Error(
-      "Usage: npm run verify:output -- --dir <dir> [--release-marker | --preview-revision=<sha>]",
+      "Usage: npm run verify:output -- --dir <dir> [--release-marker | --preview-revision=<sha> | --paired-release]",
     );
-  await certify(resolve(directory), mode === "--release-marker", previewSha);
+  const root = resolve(directory);
+  await certify(
+    paired ? join(root, "pages") : root,
+    paired || mode === "--release-marker",
+    previewSha,
+    paired ? root : undefined,
+  );
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;

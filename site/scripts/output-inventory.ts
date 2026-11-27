@@ -172,9 +172,10 @@ export function writeSearchInventory(
   directory: string,
   receipt: NotesSnapshot["receipt"],
   origin: string,
+  paired = false,
 ) {
   const files = Object.fromEntries(
-    [...readOutput(directory, receipt.mode === "preview").keys()]
+    [...readOutput(directory, paired || receipt.mode === "preview").keys()]
       .filter(isPagefind)
       .map((path) => [path, fileDigest(directory, path)]),
   );

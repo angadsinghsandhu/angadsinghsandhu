@@ -585,7 +585,7 @@ it("preserves the previous snapshot when killed before promotion and can retry",
   expect((await readCurrent(paths)).manifest.assets).toHaveLength(1);
 });
 
-async function runRelease(root: string) {
+async function runRelease(root: string, args: string[] = []) {
   for (const name of ["scripts", "node_modules"]) {
     await symlink(join(project, name), join(root, name));
   }
@@ -608,7 +608,7 @@ async function runRelease(root: string) {
     join(root, "src/pages/notes/books/worked-example.astro"),
     '<html lang="en"><body><article data-pagefind-body>Published worked example.</article></body></html>',
   );
-  return spawnSync("npm", ["run", "build:release"], {
+  return spawnSync("npm", ["run", "build:release", ...args], {
     cwd: root,
     encoding: "utf8",
     env: { ...process.env, PORTFOLIO_ORIGIN: "https://portfolio.example" },
@@ -703,4 +703,42 @@ it("denies production lessons until their checked Worker assets can be deployed"
   await expect(stat(join(paths.root, "dist"))).rejects.toMatchObject({
     code: "ENOENT",
   });
+});
+
+it("stages verified production trace bytes only in an explicit paired release", async ({
+  onTestFinished,
+}) => {
+  const paths = await workspace(onTestFinished);
+  const manifest = fixtureWithAssets();
+  manifest.mode = "production";
+  await writeArtifact(paths, manifest);
+  expect(importArtifact(paths).stderr).toBe("");
+  const result = await runRelease(paths.root, ["--", "--paired"]);
+  expect(result.stderr).toBe("");
+  expect(result.status).toBe(0);
+  const generated = join(paths.root, ".generated");
+  const stage = (await readdir(generated)).filter((path) =>
+    path.startsWith("practice-release-"),
+  );
+  expect(stage).toHaveLength(1);
+  const bundle = join(generated, stage[0]!);
+  expect(await readdir(bundle)).toEqual(["pages", "worker-assets"]);
+  expect(await readFile(join(bundle, workerPath))).toEqual(workerBytes);
+  await expect(stat(join(bundle, "pages", workerPath))).rejects.toMatchObject({
+    code: "ENOENT",
+  });
+  await expect(stat(join(paths.root, "dist"))).rejects.toMatchObject({
+    code: "ENOENT",
+  });
+});
+
+it("rejects preview snapshots even in explicit paired release mode", async ({
+  onTestFinished,
+}) => {
+  const paths = await workspace(onTestFinished);
+  await writeArtifact(paths, fixtureWithAssets());
+  expect(importArtifact(paths).stderr).toBe("");
+  const result = await runRelease(paths.root, ["--", "--paired"]);
+  expect(result.status).toBe(1);
+  expect(result.stderr).toMatch(/preview.*release/i);
 });
