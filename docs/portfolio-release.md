@@ -146,6 +146,14 @@ Keep `PORTFOLIO_PRODUCTION_TRACE_ENABLED` unset until the dedicated `portfolio-p
 
 For a paired release, the serialized publisher stages both checked trees, probes the currently served release, and builds an additive Worker version from the verified new and retained packages. It checks protected source eligibility and the live inventory before deploying the Worker. The Worker must serve the exact new inventory and package bytes before Pages deployment can begin. A timeout can only advance when a fresh canonical probe proves the complete result. Recheck both protected sources before activating Pages.
 
+## Activate owner-only progress
+
+Deploy the Worker in `site/workers/progress` only after a separate approval. Apply its migration to a dedicated D1 database and bind it as `PROGRESS`. Disable alternate Worker and preview URLs. Route the canonical `/account/` and `/api/progress/` paths, including the API export subpath, to the Worker and protect them with the same owner-only Cloudflare Access application and audience. Keep the public practice pages outside that application.
+
+Set the Worker's `PRIVATE_ORIGIN` to the canonical HTTPS origin. Configure `ACCESS_ISSUER`, `ACCESS_AUDIENCE`, and `ACCESS_OWNER_SUBJECT` from the approved Access application and owner. The Worker checks the signed Access assertion before it touches D1. Verify unauthorized requests, alternate ingress, sign-out, private cache headers, and owner export against the hosted routes before exposing the progress controls.
+
+Enable `PORTFOLIO_PRIVATE_PROGRESS_ENABLED=true` in a new verified Portfolio build after the Worker and Access policy pass those checks. Verify the signed-in workflow from both a phone and computer, including a conflicting write and the lesson revision warning. The public pages render only problem IDs and lesson revisions. Owner state stays in the private API and browser memory. A new Portfolio revision lets the release process distinguish the enabled build from the current source pair.
+
 Rollback verifies the known-good trace manifest and exact bytes on the canonical host before moving Pages traffic. The Worker retains all previously published content-addressed packages within its budgets. A release exceeding the budget stops before upload and requires a separate retention decision. The journal continues to identify the Pages deployment and retains the paired proof with the release receipt.
 
 ## Release checks

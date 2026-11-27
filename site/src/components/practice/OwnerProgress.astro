@@ -1,0 +1,50 @@
+---
+type Props =
+  | { problemId: string; lessonRevision: string }
+  | { problemId?: undefined; lessonRevision?: undefined };
+const { problemId, lessonRevision } = Astro.props;
+const enabled = process.env.PORTFOLIO_PRIVATE_PROGRESS_ENABLED === "true";
+---
+
+{enabled &&
+  (problemId ? (
+    <span
+      class="progress"
+      data-owner-progress-item
+      data-problem-id={problemId}
+      data-lesson-revision={lessonRevision}
+      data-pagefind-ignore
+      hidden
+    >
+      <button type="button" class="action" data-progress-toggle>
+        Mark studied
+      </button>
+      <button type="button" class="action" data-progress-retry hidden>
+        Retry save
+      </button>
+      <span class="status" data-progress-status role="status"></span>
+    </span>
+  ) : (
+    <a href="/account/" data-pagefind-ignore>
+      Private progress
+    </a>
+  ))}
+
+<script>
+  import { initOwnerProgress } from "../../client/practice/progress";
+  initOwnerProgress(document);
+</script>
+
+<style>
+  .progress:not([hidden]) {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-inline: 0.5rem;
+  }
+
+  .status {
+    color: var(--muted);
+  }
+</style>

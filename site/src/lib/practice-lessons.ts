@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { fromHtml } from "hast-util-from-html";
 import { toHtml } from "hast-util-to-html";
 import type { Element, Root } from "hast";
@@ -13,6 +14,10 @@ export type PracticeLessonProps = {
   lesson: PracticeLesson;
   sources: { title: string; route: string }[];
 };
+
+export function practiceLessonRevision(lesson: PracticeLesson) {
+  return createHash("sha256").update(JSON.stringify(lesson)).digest("hex");
+}
 
 export function createPracticeLessonPaths(manifest?: PortfolioSnapshotV1) {
   if (!manifest) return [];
