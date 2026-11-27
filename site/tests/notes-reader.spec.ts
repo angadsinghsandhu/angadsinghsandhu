@@ -48,13 +48,31 @@ test("Interview links to available approved study paths or the library", async (
   }
 });
 
+test("interview leads to the curriculum indexes without linking draft lessons", async ({
+  page,
+}) => {
+  await page.goto("/interview/");
+  await page
+    .getByRole("link", { name: "LeetCode practice", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "LeetCode practice" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("No verified LeetCode lessons are available yet."),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Study paths", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Study paths", exact: true }),
+  ).toBeVisible();
+});
+
 test("draft curriculum and malformed reader routes are absent", async ({
   request,
 }) => {
   for (const route of [
-    "/practice/leetcode/",
     "/practice/leetcode/1/",
-    "/practice/paths/",
+    "/practice/paths/not-a-study-path/",
     "/notes/not-a-notes-entry/",
   ])
     expect((await request.get(route)).status(), route).toBe(404);

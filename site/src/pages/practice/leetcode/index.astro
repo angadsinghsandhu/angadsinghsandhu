@@ -1,0 +1,14 @@
+---
+import PracticeIndex from "../../../components/practice/PracticeIndex.astro";
+import SiteLayout from "../../../layouts/SiteLayout.astro";
+import { readPreparedPracticeDiscovery } from "../../../lib/practice-discovery";
+
+const { problems } = await readPreparedPracticeDiscovery();
+---
+
+<SiteLayout
+  title="LeetCode practice"
+  description="Browse verified LeetCode lessons."
+>
+  <PracticeIndex {problems} />
+</SiteLayout>

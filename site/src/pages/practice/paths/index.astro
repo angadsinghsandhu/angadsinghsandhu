@@ -1,0 +1,50 @@
+---
+import SiteLayout from "../../../layouts/SiteLayout.astro";
+import { readPreparedPracticeDiscovery } from "../../../lib/practice-discovery";
+
+const { paths } = await readPreparedPracticeDiscovery();
+---
+
+<SiteLayout title="Study paths" description="Explore LeetCode study sequences.">
+  <div data-pagefind-ignore>
+    <h1>Study paths</h1>
+    <p>
+      <a href="/practice/leetcode/">LeetCode practice</a>
+    </p>
+    {paths.length ? (
+      <ul>
+        {paths.map(({ id, title, description, available, outline }) => (
+          <li>
+            <h2>
+              <a href={`/practice/paths/${id}/`}>{title}</a>
+            </h2>
+            <p>{description}</p>
+            <p>
+              {available} of {outline.length} targets have verified lessons.
+            </p>
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <p>No study paths are available yet.</p>
+    )}
+  </div>
+</SiteLayout>
+
+<style>
+  div {
+    display: grid;
+    gap: 1rem;
+  }
+
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  li {
+    border-top: 1px solid var(--rule);
+    padding-block: 0.75rem;
+  }
+</style>
