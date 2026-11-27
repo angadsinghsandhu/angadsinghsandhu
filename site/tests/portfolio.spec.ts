@@ -269,7 +269,9 @@ test("the fixture release fetches and plays media only on request", async ({
   );
   await page.getByRole("button", { name: "Play release" }).click();
   await fetched;
-  const audio = page.frameLocator("iframe").locator("audio");
+  const player = page.frameLocator("iframe");
+  await player.getByRole("button", { name: "Play fixture track" }).click();
+  const audio = player.locator("audio");
   await expect
     .poll(() =>
       audio.evaluate((element) => (element as HTMLAudioElement).currentTime),
