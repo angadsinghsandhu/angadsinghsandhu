@@ -1,5 +1,6 @@
 import { statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { profile } from "../src/content/editorial";
 
@@ -116,7 +117,8 @@ test("first-release indexes have no broken local links", async ({
 });
 
 test("legacy entry points keep their useful targets", async ({ page }) => {
-  expect(statSync("dist/portfolio-details.html").isFile()).toBe(true);
+  const output = process.env.PORTFOLIO_PAIRED_PREVIEW_DIR || "dist";
+  expect(statSync(join(output, "portfolio-details.html")).isFile()).toBe(true);
   await page.goto("/index.html");
   for (const id of ["hero", "about", "resume", "portfolio", "contact"]) {
     await expect(page.locator(`#${id}`)).toBeAttached();
