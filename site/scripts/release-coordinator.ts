@@ -20,7 +20,8 @@ type Pages = ReturnType<typeof createReleasePages>;
 type Row = NonNullable<Awaited<ReturnType<Journal["readActive"]>>>;
 type Active = Row & { deploymentId: string };
 type Reservation = Parameters<Journal["begin"]>[0];
-type Stage = Parameters<Pages["deploy"]>[1];
+type Stage = Parameters<Pages["deploy"]>[1] & { workerDirectory?: string };
+type Practice = NonNullable<ReleaseReceipt["practice"]>;
 
 export type ReleaseCoordinatorRequest =
   | { kind: "release"; verified: VerifiedRelease }
@@ -50,6 +51,15 @@ export type ReleaseCoordinatorGate = Parameters<
     operation: (stage: Stage) => Promise<Outcome>,
   ) => Promise<Outcome>;
   smoke: (receipt: ReleaseReceipt) => Promise<boolean>;
+  practice?: {
+    probe: (proof: Practice) => Promise<boolean>;
+    ensure: (
+      directory: string,
+      proof: Practice,
+      executable: string,
+      stillEligible: () => Promise<boolean>,
+    ) => Promise<boolean>;
+  };
   fetchMarker?: typeof fetch;
   firstCutover?: boolean;
   automaticRestore?: boolean;
@@ -105,6 +115,14 @@ async function retained(
     : null;
 }
 
+async function tracesHealthy(
+  gate: ReleaseCoordinatorGate,
+  receipt: ReleaseReceipt,
+) {
+  if (!receipt.practice) return true;
+  return (await gate.practice?.probe(receipt.practice)) === true;
+}
+
 async function canonicalHealth(
   gate: ReleaseCoordinatorGate,
   target: Pick<Active, "receipt" | "deploymentId">,
@@ -118,7 +136,8 @@ async function canonicalHealth(
     gate.fetchMarker,
   );
   if (match !== "selected") return "unknown";
-  const healthy = await gate.smoke(receipt);
+  const healthy =
+    (await gate.smoke(receipt)) && (await tracesHealthy(gate, receipt));
   if ((await gate.pages.readServingDeploymentId()) !== deploymentId)
     return "unknown";
   return healthy === true
@@ -185,6 +204,7 @@ async function reconcile(
   if (
     gate.automaticRestore !== true ||
     health !== "smoke-failed" ||
+    !(await tracesHealthy(gate, target.receipt)) ||
     (await gate.pages.readServingDeploymentId()) !== proof.deploymentId
   )
     return waiting;
@@ -242,6 +262,30 @@ async function release(
     if (!(await lstat(join(directory, releaseMarkerPath))).isFile())
       throw new Error("Release staging marker must be a regular file");
     await verifyReleaseMarker(directory, marker(gate.origin, receipt));
+
+    if (receipt.practice) {
+      const traces = gate.practice;
+      const worker = stage.workerDirectory;
+      if (
+        !traces ||
+        !worker ||
+        !(await traces.ensure(
+          worker,
+          receipt.practice,
+          executable,
+          async () => {
+            if (
+              active &&
+              (await gate.pages.readServingDeploymentId()) !==
+                active.deploymentId
+            )
+              return false;
+            return (await evidence()).decision === "publish";
+          },
+        ))
+      )
+        return deny("Could not prove the trace Worker activation");
+    }
 
     const { repository, ref, sha, runId } = verified.notesCandidate;
     const pending = await reserve(gate, {
@@ -322,6 +366,8 @@ async function rollback(
   const row = await gate.journal.readKnownGood(knownGoodId);
   const target = row && (await retained(gate, row));
   if (!target) return deny("Known-good provider deployment is unavailable");
+  if (!(await tracesHealthy(gate, target.receipt)))
+    return deny("Known-good trace packages are unavailable");
   if (
     target.deploymentId === active.deploymentId &&
     isDeepStrictEqual(target.receipt, active.receipt)

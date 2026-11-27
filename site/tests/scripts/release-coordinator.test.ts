@@ -1,5 +1,8 @@
-import { expect, it } from "vitest";
-import { coordinateRelease } from "../../scripts/release-coordinator.ts";
+import { expect, it, vi } from "vitest";
+import {
+  coordinateRelease,
+  type ReleaseCoordinatorGate,
+} from "../../scripts/release-coordinator.ts";
 import {
   fixture,
   releaseRequest,
@@ -350,4 +353,71 @@ it("aborts before upload if the prior serving deployment changed during preparat
   expect(f.state.attempted).toBe(false);
   expect(f.abort).toHaveBeenCalledExactlyOnceWith(3);
   expect(f.sourceHttp.mock.calls).toHaveLength(readsBeforePreflight);
+});
+
+const practice = {
+  pagesSha256: "1".repeat(64),
+  workerSha256: "2".repeat(64),
+  workerFiles: 14,
+};
+const paired = {
+  ...releaseRequest,
+  verified: {
+    ...releaseRequest.verified,
+    receipt: { ...releaseRequest.verified.receipt, practice },
+  },
+};
+function pairedGate(
+  f: ReturnType<typeof fixture>,
+  ensure: NonNullable<ReleaseCoordinatorGate["practice"]>["ensure"],
+) {
+  return {
+    ...f.gate,
+    practice: { ensure, probe: async () => true },
+    withStage: (
+      receipt: Parameters<typeof f.gate.withStage>[0],
+      callback: Parameters<typeof f.gate.withStage>[1],
+    ) =>
+      f.gate.withStage(receipt, (stage) =>
+        callback({ ...stage, workerDirectory: "/fixture/worker-assets" }),
+      ),
+  };
+}
+it("publishes and probes trace packages before reserving the Pages deployment", async () => {
+  const f = fixture();
+  const ensure = vi
+    .fn<NonNullable<ReleaseCoordinatorGate["practice"]>["ensure"]>()
+    .mockImplementation(async (worker, proof, _executable, eligible) => {
+      expect(worker).toBe("/fixture/worker-assets");
+      expect(proof).toEqual(practice);
+      expect(f.begin).not.toHaveBeenCalled();
+      return eligible();
+    });
+  await expect(
+    coordinateRelease(paired, pairedGate(f, ensure)),
+  ).resolves.toMatchObject({ decision: "confirmed" });
+  expect(ensure).toHaveBeenCalledOnce();
+  expect(f.deploy).toHaveBeenCalledOnce();
+});
+it("leaves Pages and its journal alone after an unproved Worker activation", async () => {
+  const f = fixture();
+  const gate = pairedGate(f, async () => false);
+  await expect(coordinateRelease(paired, gate)).resolves.toMatchObject({
+    decision: "deny",
+  });
+  expect(f.begin).not.toHaveBeenCalled();
+  expect(f.deploy).not.toHaveBeenCalled();
+});
+it("requires retained packages before rolling back to a paired Pages deployment", async () => {
+  const f = fixture();
+  f.history.get(1)!.receipt = { ...f.history.get(1)!.receipt, practice };
+  const gate = {
+    ...f.gate,
+    practice: { ensure: async () => true, probe: async () => false },
+  };
+  await expect(coordinateRelease(rollbackRequest, gate)).resolves.toMatchObject(
+    { decision: "deny" },
+  );
+  expect(f.rollback).not.toHaveBeenCalled();
+  expect(f.begin).not.toHaveBeenCalled();
 });

@@ -250,3 +250,38 @@ describe("serialized upload decision", () => {
     ).toBe("publish");
   });
 });
+
+it("requires an exact paired Pages and Worker identity in the verified receipt", () => {
+  const practice = {
+    pagesSha256: "a".repeat(64),
+    workerSha256: "b".repeat(64),
+    workerFiles: 1,
+  };
+  const paired = { ...receipt, practice };
+  const evidence: ReleaseEvidence = {
+    ...release,
+    request: { kind: "release", receipt: paired },
+    verified: paired,
+  };
+  expect(evaluateRelease(evidence).decision).toBe("publish");
+  expect(evaluateRelease({ ...evidence, verified: receipt }).decision).toBe(
+    "deny",
+  );
+  expect(
+    evaluateRelease({
+      ...evidence,
+      verified: {
+        ...paired,
+        practice: { ...practice, workerSha256: "c".repeat(64) },
+      },
+    }).decision,
+  ).toBe("deny");
+  const invalid = { ...paired, practice: { ...practice, workerFiles: 0 } };
+  expect(
+    evaluateRelease({
+      ...evidence,
+      request: { kind: "release", receipt: invalid },
+      verified: invalid,
+    }).decision,
+  ).toBe("deny");
+});

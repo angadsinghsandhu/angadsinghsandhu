@@ -297,3 +297,24 @@ test("bounds a stalled fetch and a stalled response body", async () => {
     expect(http.mock.calls[attempt][1]?.signal?.aborted).toBe(true);
   }
 });
+
+test("round-trips an exact paired proof through the private release journal", async () => {
+  const { writer, reader } = openJournals();
+  const practice = {
+    pagesSha256: "a".repeat(64),
+    workerSha256: "b".repeat(64),
+    workerFiles: 1,
+  };
+  const paired = { ...receipt, practice };
+  const pending = await writer.begin({
+    ...request(null),
+    firstCutover: true,
+    receipt: paired,
+  });
+  expect(pending?.receipt).toEqual(paired);
+  expect((await reader.readPending())?.receipt).toEqual(paired);
+  expect(
+    (await writer.confirmAfterProviderProof(1, deploymentId))?.receipt,
+  ).toEqual(paired);
+  expect((await reader.readActive())?.receipt).toEqual(paired);
+});

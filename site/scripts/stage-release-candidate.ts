@@ -1,13 +1,17 @@
 import { execFile } from "node:child_process";
 import { constants } from "node:fs";
-import { access, mkdtemp, realpath, rm, stat } from "node:fs/promises";
+import { access, chmod, mkdtemp, realpath, rm, stat } from "node:fs/promises";
 import { isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { outputOrigin } from "./notes-redirects.ts";
 import { downloadReleaseArtifactArchive } from "./release-artifact-transport.ts";
 import { verifyReleaseMarker } from "./release-build-marker.ts";
-import type { ReleaseReceipt } from "./release-policy.ts";
+import {
+  practiceBundleProofSchema,
+  type ReleaseReceipt,
+} from "./release-policy.ts";
+import { verifyPracticeBundle } from "./verify-practice-bundle.ts";
 
 const stageArchive = promisify(execFile);
 const script = fileURLToPath(
@@ -33,7 +37,11 @@ export function createReleaseStage({
 
   return async function withStage<T>(
     receipt: ReleaseReceipt,
-    run: (stage: { directory: string; executable: string }) => Promise<T>,
+    run: (stage: {
+      directory: string;
+      executable: string;
+      workerDirectory?: string;
+    }) => Promise<T>,
   ): Promise<T> {
     if (
       !isAbsolute(scratchParent) ||
@@ -52,12 +60,15 @@ export function createReleaseStage({
       await access(path, constants.X_OK);
     }
 
+    const practice = practiceBundleProofSchema
+      .optional()
+      .parse(receipt.practice);
     const scratch = await mkdtemp(join(scratchParent, ".portfolio-release-"));
     try {
       const archive = join(scratch, "candidate.zip");
-      const directory = join(scratch, "assets");
+      const assets = join(scratch, "assets");
       await downloadReleaseArtifactArchive(receipt, api, archive);
-      await stageArchive(pythonExecutable, ["-I", script, archive, directory], {
+      await stageArchive(pythonExecutable, ["-I", script, archive, assets], {
         cwd: scratch,
         env: {},
         shell: false,
@@ -67,6 +78,17 @@ export function createReleaseStage({
       }).catch(() => {
         throw new Error("Could not stage the verified release archive");
       });
+      const directory = practice ? join(assets, "pages") : assets;
+      const workerDirectory = practice
+        ? join(assets, "worker-assets")
+        : undefined;
+      if (practice && workerDirectory) {
+        await verifyPracticeBundle(assets, practice);
+        await Promise.all([
+          chmod(directory, 0o700),
+          chmod(workerDirectory, 0o700),
+        ]);
+      }
       await verifyReleaseMarker(directory, {
         origin,
         portfolioSha: receipt.portfolioSha,
@@ -74,7 +96,11 @@ export function createReleaseStage({
         runId: receipt.runId,
         runAttempt: receipt.runAttempt,
       });
-      return await run({ directory, executable });
+      return await run({
+        directory,
+        executable,
+        ...(workerDirectory ? { workerDirectory } : {}),
+      });
     } finally {
       await rm(scratch, { recursive: true, force: true });
     }

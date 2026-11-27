@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { outputOrigin } from "./notes-redirects.ts";
 import { releaseArtifactIdentity } from "./release-artifact-download.ts";
+import { practiceBundleProofSchema } from "./release-policy.ts";
 import {
   notesJobName,
   notesRepository,
@@ -16,6 +17,7 @@ import {
 } from "./release-coordinator.ts";
 import { createReleaseJournal } from "./release-journal.ts";
 import { createReleasePages } from "./release-pages.ts";
+import { createReleaseTraceProvider } from "./release-trace-provider.ts";
 import { createReleaseSmoke } from "./release-smoke.ts";
 import { readGitHub, readProtectedHead } from "./release-source-proof.ts";
 import { createReleaseStage } from "./stage-release-candidate.ts";
@@ -36,6 +38,7 @@ const receiptSchema = releaseArtifactIdentity
     notesSha: sha,
     snapshotSchema: id,
     manifestSha256: releaseArtifactIdentity.shape.archiveSha256,
+    practice: practiceBundleProofSchema.optional(),
   })
   .strict();
 const repositoryIdentity = z.object({
@@ -236,6 +239,19 @@ export async function runProductionRelease(
     env,
     event,
   );
+  const traceToken =
+    env.PORTFOLIO_PRODUCTION_TRACE_ENABLED === "true"
+      ? env.PORTFOLIO_PRODUCTION_TRACE_TOKEN
+      : undefined;
+  if (
+    request.kind === "release" &&
+    request.verified.receipt.practice &&
+    !traceToken
+  )
+    throw new Error(
+      "Paired releases require Worker activation before hosted publication",
+    );
+
   const sourceApi = {
     token: required(env.PORTFOLIO_RELEASE_SOURCE_TOKEN),
     http: sourceHttp,
@@ -302,6 +318,11 @@ export async function runProductionRelease(
     pages,
     withStage,
     smoke,
+    practice: createReleaseTraceProvider({
+      accountId,
+      origin,
+      ...(traceToken ? { token: traceToken } : {}),
+    }),
     firstCutover:
       request.kind === "release" &&
       env.PORTFOLIO_PRODUCTION_FIRST_CUTOVER === "true",

@@ -1,4 +1,4 @@
-import { appendFile } from "node:fs/promises";
+import { appendFile, readFile } from "node:fs/promises";
 import { z } from "zod";
 import {
   notesSnapshotDirectory,
@@ -8,7 +8,11 @@ import {
   checkReleaseArtifactMetadata,
   releaseArtifactIdentity,
 } from "./release-artifact-download.ts";
-import type { ReleaseReceipt } from "./release-policy.ts";
+import {
+  practiceBundleProofSchema,
+  type ReleaseReceipt,
+} from "./release-policy.ts";
+import { readPracticeBundleForSnapshot } from "./verify-practice-bundle.ts";
 
 const sha = z.string().regex(/^[a-f0-9]{40}(?![\s\S])/u);
 const environmentId = z
@@ -27,6 +31,7 @@ export async function readReleaseArtifactProof(
   upload: unknown,
   snapshotDirectory: string,
   api: Parameters<typeof checkReleaseArtifactMetadata>[1],
+  bundle?: string,
 ): Promise<ReleaseReceipt> {
   const receipt = uploaded.parse(upload);
   const snapshot = await readProductionNotesSnapshot(snapshotDirectory);
@@ -35,12 +40,36 @@ export async function readReleaseArtifactProof(
       "Validated Notes snapshot revision differs from the selected revision",
     );
 
+  if (Boolean(bundle) !== Boolean(snapshot.workerAssets.length))
+    throw new Error(
+      "Paired artifact selection differs from the Notes snapshot",
+    );
+  const practice = bundle
+    ? practiceBundleProofSchema.parse(
+        JSON.parse(await readFile(bundle + ".proof.json", "utf8")),
+      )
+    : undefined;
+  if (bundle && practice) {
+    const current = await readPracticeBundleForSnapshot(
+      bundle,
+      snapshot.workerAssets,
+    );
+    if (
+      current.pagesSha256 !== practice.pagesSha256 ||
+      current.workerSha256 !== practice.workerSha256 ||
+      current.workerFiles !== practice.workerFiles
+    )
+      throw new Error(
+        "Uploaded output differs from the certified practice artifact",
+      );
+  }
   await checkReleaseArtifactMetadata(receipt, api);
 
   return {
     ...receipt,
     snapshotSchema: snapshot.manifest.schemaVersion,
     manifestSha256: snapshot.receipt.manifestSha256,
+    ...(practice ? { practice } : {}),
   };
 }
 
@@ -60,6 +89,7 @@ if (import.meta.main) {
       },
       notesSnapshotDirectory,
       { token: env.PORTFOLIO_ARTIFACT_TOKEN ?? "" },
+      env.CANDIDATE_PRACTICE_BUNDLE || undefined,
     );
     await appendFile(
       env.GITHUB_OUTPUT,
