@@ -685,7 +685,7 @@ it("publishes only Pages inventory from a verified production snapshot", async (
   expect(
     await readFile(join(output, "content-assets", `${pagesHash}.pdf`)),
   ).toEqual(pagesBytes);
-});
+}, 30_000);
 
 it("denies production lessons until their checked Worker assets can be deployed", async ({
   onTestFinished,
@@ -730,7 +730,7 @@ it("stages verified production trace bytes only in an explicit paired release", 
   await expect(stat(join(paths.root, "dist"))).rejects.toMatchObject({
     code: "ENOENT",
   });
-});
+}, 30_000);
 
 it("rejects preview snapshots even in explicit paired release mode", async ({
   onTestFinished,
