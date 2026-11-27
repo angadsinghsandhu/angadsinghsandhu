@@ -15,7 +15,10 @@ type TraceFile = [path: string, bytes: number, sha256: string];
 
 export function digestTraceTree(files: TraceFile[]) {
   const digest = createHash("sha256");
-  for (const file of files) digest.update(JSON.stringify(file) + "\n");
+  for (const file of files.toSorted(([left], [right]) =>
+    left.localeCompare(right, "en"),
+  ))
+    digest.update(JSON.stringify(file) + "\n");
   return digest.digest("hex");
 }
 

@@ -15,6 +15,7 @@ import {
   writePracticeTraceAssets,
 } from "../../scripts/stage-practice-traces.ts";
 import {
+  readPracticeBundleForSnapshot,
   readPracticeBundleProof,
   verifyPracticeBundle,
 } from "../../scripts/verify-practice-bundle.ts";
@@ -36,6 +37,30 @@ async function withBundle(
     await rm(root, { recursive: true, force: true });
   }
 }
+
+test("certifies trace packages listed in Notes lesson order", () =>
+  withBundle(async (root, traceDir) => {
+    const assets = await Promise.all(
+      ["{}", "[]"].map(async (body) => {
+        const sha256 = hash(body);
+        const name = `${sha256}.json`;
+        const file = join(traceDir, name);
+        await writeFile(file, body);
+        return {
+          file,
+          sha256,
+          bytes: Buffer.byteLength(body),
+          publicPath: `/practice-traces/${name}`,
+          exportPath: `worker-assets/practice-traces/${name}`,
+        };
+      }),
+    );
+    assets.sort((a, b) => b.publicPath.localeCompare(a.publicPath, "en"));
+    const expected = await readPracticeBundleProof(root);
+    await expect(readPracticeBundleForSnapshot(root, assets)).resolves.toEqual(
+      expected,
+    );
+  }));
 
 test("recomputes both tree digests with the existing staging tuple format", () =>
   withBundle(async (root, traceDir) => {
