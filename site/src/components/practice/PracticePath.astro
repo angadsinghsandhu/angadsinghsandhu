@@ -1,0 +1,76 @@
+---
+import PracticePathNode from "./PracticePathNode.astro";
+import {
+  nextPracticeProblem,
+  type PracticeStudyPath,
+} from "../../lib/practice-discovery";
+
+interface Props {
+  path: PracticeStudyPath;
+}
+const { path } = Astro.props;
+const next = nextPracticeProblem(path);
+---
+
+<div data-pagefind-ignore>
+  <nav aria-label="Practice">
+    <a href="/practice/paths/">Study paths</a>
+    <a href="/practice/leetcode/">LeetCode practice</a>
+  </nav>
+  <h1>{path.title}</h1>
+  <p>{path.description}</p>
+  <p>
+    {path.available} of {path.outline.length} targets have verified lessons.
+  </p>
+  {next && (
+    <p>
+      Suggested lesson:{" "}
+      <a href={next.route}>
+        {next.number}. {next.title}
+      </a>
+    </p>
+  )}
+  <section aria-labelledby="path-tree-heading">
+    <h2 id="path-tree-heading">Study tree</h2>
+    <ul aria-labelledby="path-tree-heading">
+      {path.rootIds.map((id) => (
+        <PracticePathNode {path} {id} />
+      ))}
+    </ul>
+  </section>
+  <section aria-labelledby="path-outline-heading">
+    <h2 id="path-outline-heading">Ordered outline</h2>
+    <ol aria-labelledby="path-outline-heading">
+      {path.outline.map(({ id, number, title, route }) => (
+        <li data-problem-id={id}>
+          {route ? (
+            <a href={route}>
+              {number}. {title}
+            </a>
+          ) : (
+            <span>
+              {number}. {title} <small>Pending</small>
+            </span>
+          )}
+        </li>
+      ))}
+    </ol>
+  </section>
+</div>
+
+<style>
+  div {
+    display: grid;
+    gap: 1rem;
+  }
+
+  nav {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  small {
+    color: var(--muted);
+  }
+</style>

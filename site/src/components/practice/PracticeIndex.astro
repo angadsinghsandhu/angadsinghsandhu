@@ -1,0 +1,170 @@
+---
+import type { PracticeResult } from "../../lib/practice-discovery";
+
+interface Props {
+  problems: PracticeResult[];
+}
+const { problems } = Astro.props;
+const label = (slug: string) =>
+  slug.charAt(0).toUpperCase() + slug.slice(1).replaceAll("-", " ");
+const topics = [...new Set(problems.flatMap(({ topics }) => topics))].sort();
+const companies = [
+  ...new Map(
+    problems.flatMap(({ companies }) =>
+      companies.map(
+        ({ companyId, companyName }) => [companyId, companyName] as const,
+      ),
+    ),
+  ),
+].sort((a, b) => a[1].localeCompare(b[1]));
+---
+
+<section data-practice-discovery data-pagefind-ignore>
+  <h1>LeetCode practice</h1>
+  <p>
+    <a href="/practice/paths/">Study paths</a>
+  </p>
+  {problems.length === 0 ? (
+    <p>No verified LeetCode lessons are available yet.</p>
+  ) : (
+    <>
+      <form hidden aria-label="Filter lessons">
+        <label>
+          Number or title
+          <input type="search" name="q" />
+        </label>
+        <label>
+          Topic
+          <select name="topic">
+            <option value="">All topics</option>
+            {topics.map((topic) => (
+              <option value={topic}>{label(topic)}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Difficulty
+          <select name="difficulty">
+            <option value="">All difficulties</option>
+            {["easy", "medium", "hard"].map((difficulty) => (
+              <option value={difficulty}>{label(difficulty)}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Company
+          <select name="company">
+            <option value="">All companies</option>
+            <option value="unknown">Unknown</option>
+            {companies.map(([id, name]) => (
+              <option value={id}>{name}</option>
+            ))}
+          </select>
+        </label>
+        <button type="submit" class="action action--primary">
+          Filter
+        </button>
+        <a href="/practice/leetcode/" class="action">
+          Clear filters
+        </a>
+      </form>
+      <p role="status" data-filter-status>
+        {problems.length} verified{" "}
+        {problems.length === 1 ? "lesson" : "lessons"}
+      </p>
+      <ul aria-label="Matching lessons">
+        {problems.map(
+          ({ id, number, title, topics, difficulty, companies, route }) => (
+            <li
+              data-practice-result
+              data-problem-id={id}
+              data-number={number}
+              data-title={title.toLowerCase()}
+              data-topics={topics.join(" ")}
+              data-difficulty={difficulty}
+              data-companies={companies
+                .map(({ companyId }) => companyId)
+                .join(" ")}
+            >
+              <a href={route}>
+                {number}. {title}
+              </a>
+              <p>{[label(difficulty), ...topics.map(label)].join(" · ")}</p>
+              <p>
+                {companies.length
+                  ? companies
+                      .map(
+                        ({ companyName, observedOn }) =>
+                          `${companyName} (observed ${observedOn})`,
+                      )
+                      .join(" · ")
+                  : "Company evidence unknown"}
+              </p>
+            </li>
+          ),
+        )}
+      </ul>
+    </>
+  )}
+</section>
+
+<script>
+  import { initPracticeDiscovery } from "../../client/practice/discovery";
+  for (const root of document.querySelectorAll<HTMLElement>(
+    "[data-practice-discovery]",
+  ))
+    initPracticeDiscovery(root);
+</script>
+
+<style>
+  section {
+    display: grid;
+    gap: 1.25rem;
+  }
+
+  form:not([hidden]) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: end;
+  }
+
+  label {
+    display: grid;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+
+  input,
+  select {
+    min-height: var(--target);
+    max-width: 100%;
+    padding: 0.4rem 0.55rem;
+    background: var(--graphite);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    color: var(--ink);
+    font: inherit;
+  }
+
+  ul {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  li {
+    border-top: 1px solid var(--rule);
+    padding-top: 0.75rem;
+  }
+
+  li a {
+    font-weight: 650;
+  }
+
+  li p {
+    font-size: 0.92rem;
+  }
+</style>

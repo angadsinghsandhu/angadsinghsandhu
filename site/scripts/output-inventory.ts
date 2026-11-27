@@ -35,7 +35,9 @@ export function readOutput(directory: string, curriculum = false) {
     const stat = lstatSync(absolute);
     if (
       privatePath.test(path) ||
-      (!curriculum && /^\/practice(?:\/|$)/iu.test(path))
+      (!curriculum &&
+        /^\/practice\/leetcode\/[^/]+/iu.test(path) &&
+        path !== "/practice/leetcode/index.html")
     )
       throw new Error(`Private output path: ${path}`);
     if (stat.isDirectory()) {
