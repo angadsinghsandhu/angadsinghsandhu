@@ -95,6 +95,7 @@ jobs:
           NOTES_REVISION: ${{ needs.select.outputs.notes_sha }}
           PORTFOLIO_ORIGIN: ${{ needs.select.outputs.origin }}
           PORTFOLIO_NOTES_BROWSER: archive
+          PORTFOLIO_PRIVATE_PROGRESS_ENABLED: ${{ vars.PORTFOLIO_PRIVATE_PROGRESS_ENABLED }}
         run: |
           staging="$(mktemp -d "$RUNNER_TEMP/portfolio-notes.XXXXXX")"
           (

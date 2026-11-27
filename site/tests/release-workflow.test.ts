@@ -63,6 +63,19 @@ it("keeps source and candidate build jobs separate from the protected production
   );
 });
 
+it("sets the private progress flag only for the combined candidate verifier", () => {
+  const verify = releases.match(
+    /^ {6}- name: Verify combined Portfolio and Notes\n([\s\S]+?)(?=^ {6}- )/m,
+  )?.[1];
+  const flag = "PORTFOLIO_PRIVATE_PROGRESS_ENABLED";
+  expect(verify).toContain(
+    "PORTFOLIO_PRIVATE_PROGRESS_ENABLED: ${{ vars.PORTFOLIO_PRIVATE_PROGRESS_ENABLED }}",
+  );
+  expect(verify).toMatch(/npm run build:release[\s\S]*npm run verify:output/);
+  expect(releases.replace(verify ?? "", "")).not.toContain(flag);
+  expect(workflow).not.toContain(flag);
+});
+
 it("queues publication and operator work on the same protected target", () => {
   const operator = readFileSync(
     new URL("../../.github/workflows/portfolio-rollback.yml", import.meta.url),
