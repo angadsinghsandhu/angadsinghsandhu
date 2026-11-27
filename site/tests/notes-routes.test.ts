@@ -75,3 +75,26 @@ it("rejects a cyclic topic hierarchy before claiming routes", () => {
     /ancestry/i,
   );
 });
+
+it("claims the manifest's eligible numeric lesson route exactly once", () => {
+  const data = snapshot();
+  data.curriculum.lessons.push({
+    problemId: "leetcode:1",
+    route: "/practice/leetcode/1/",
+    status: "verified",
+    bodyHtml: "<p>Worked solution</p>",
+    headings: [],
+    approaches: [],
+  });
+  expect(
+    claimNotesRoutes({ manifest: data }, existing).pages.has(
+      "/practice/leetcode/1/",
+    ),
+  ).toBe(true);
+  expect(() =>
+    claimNotesRoutes(
+      { manifest: data },
+      new Set(["/practice/leetcode/1/index.html"]),
+    ),
+  ).toThrow(/route collision/u);
+});

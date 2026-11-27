@@ -1,0 +1,176 @@
+---
+import type { PracticeApproach } from "../../lib/practice-lessons";
+
+interface Props {
+  problemId: string;
+  approach: PracticeApproach;
+}
+
+const { problemId, approach } = Astro.props;
+const { trace } = approach;
+---
+
+{trace && (
+  <div
+    class="trace-player"
+    data-trace-player
+    data-pagefind-ignore
+    data-problem-id={problemId}
+    data-approach-id={approach.id}
+    data-implementation-sha256={approach.implementationSha256}
+    data-trace-url={trace.url}
+    data-trace-sha256={trace.sha256}
+    data-trace-bytes={trace.bytes}
+  >
+    <button type="button" data-player-load hidden>
+      Load interactive trace
+    </button>
+    <p class="trace-load-status" role="status" data-player-status />
+    <div class="trace-panel" data-player-panel hidden>
+      <div class="trace-controls" data-player-controls>
+        <label>
+          Example
+          <select data-player-example>
+            {trace.exampleIds.map((id) => (
+              <option value={id}>{id.replaceAll("-", " ")}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Speed
+          <select data-player-speed>
+            <option value="0.5">0.5×</option>
+            <option value="1" selected>
+              1×
+            </option>
+            <option value="2">2×</option>
+          </select>
+        </label>
+        <div class="trace-buttons">
+          <button type="button" data-player-previous>
+            Previous
+          </button>
+          <button type="button" data-player-next>
+            Next
+          </button>
+          <button type="button" data-player-play>
+            Play
+          </button>
+          <button type="button" data-player-reset>
+            Reset
+          </button>
+        </div>
+      </div>
+      <p data-player-motion-note hidden>
+        Automatic playback is disabled by your reduced-motion preference.
+      </p>
+      <div class="trace-frame" aria-live="polite" aria-atomic="true">
+        <p class="trace-step" data-player-step />
+        <p data-player-explanation />
+        <p class="trace-lines" data-player-code-lines />
+      </div>
+      <div data-player-state />
+    </div>
+  </div>
+)}
+
+<script>
+  import { mountTracePlayer } from "../../client/practice/player";
+
+  document
+    .querySelectorAll<HTMLElement>("[data-trace-player]")
+    .forEach(mountTracePlayer);
+</script>
+
+<style>
+  .trace-player {
+    margin-block: 1rem;
+  }
+
+  .trace-load-status:empty {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .trace-player [hidden] {
+    display: none;
+  }
+
+  .trace-panel {
+    display: grid;
+    gap: 1rem;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    padding: clamp(0.75rem, 4vw, 1.25rem);
+  }
+
+  .trace-controls,
+  .trace-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 0.5rem;
+  }
+
+  .trace-controls label {
+    display: grid;
+    max-width: 100%;
+    gap: 0.25rem;
+  }
+
+  .trace-controls select {
+    max-width: 100%;
+  }
+
+  .trace-player button,
+  .trace-player select {
+    min-block-size: var(--target);
+    padding: 0.4rem 0.65rem;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    background: var(--graphite);
+    color: var(--ink);
+    font: inherit;
+  }
+
+  .trace-player button[aria-disabled="true"] {
+    color: var(--muted);
+  }
+
+  .trace-frame {
+    display: grid;
+    gap: 0.25rem;
+  }
+
+  .trace-step {
+    font-weight: 650;
+  }
+
+  .trace-lines {
+    color: var(--accent);
+  }
+
+  .trace-player :global(.trace-highlight) {
+    color: var(--accent);
+  }
+
+  .trace-player [data-player-state] {
+    overflow: auto;
+    overflow-wrap: anywhere;
+  }
+
+  :global([data-practice-code] .trace-current-line) {
+    display: inline-block;
+    min-width: 100%;
+    background: var(--active);
+    border-inline-start: 2px solid var(--accent);
+  }
+
+  :global([data-practice-step][aria-current="step"]) {
+    outline: 1px solid var(--accent);
+    outline-offset: 3px;
+  }
+</style>

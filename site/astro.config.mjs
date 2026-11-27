@@ -52,12 +52,13 @@ export default defineConfig({
                 await compactOutputHtml(fileURLToPath(file));
           if (process.env.PORTFOLIO_NOTES_LOCAL_PDF === "1")
             await stagePdfAssets(join(out, "pdfjs"));
-          if (
-            !pages.some(({ pathname }) =>
-              /^(?:notes|resources)\//u.test(pathname),
-            )
-          )
-            return;
+          const archive = pages.some(({ pathname }) =>
+            /^(?:notes|resources)\//u.test(pathname),
+          );
+          const curriculum = pages.some(({ pathname }) =>
+            /^practice\/leetcode\/[1-9][0-9]*\/?$/u.test(pathname),
+          );
+          if (!archive && !curriculum) return;
           execFileSync(resolve("node_modules/.bin/pagefind"), ["--site", out], {
             stdio: "inherit",
           });

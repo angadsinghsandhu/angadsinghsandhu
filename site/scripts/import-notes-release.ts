@@ -1,8 +1,9 @@
 import { execFileSync } from "node:child_process";
-import { writeFile } from "node:fs/promises";
+import { mkdtemp, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { outputOrigin } from "./notes-redirects.ts";
 import { releaseInventory, writeSearchInventory } from "./output-inventory.ts";
+import { stagePracticeTraces } from "./stage-practice-traces.ts";
 import {
   copyNotesPagesAssets,
   notesSnapshotDirectory,
@@ -21,13 +22,26 @@ try {
   const snapshot = preview
     ? await readNotesSnapshot(directory, revision)
     : await readProductionNotesSnapshot(directory);
+  if (snapshot.manifest.verifiedCurriculumIds.length) {
+    if (!preview || snapshot.receipt.mode !== "preview")
+      throw new Error(
+        "Curriculum release requires checked Worker asset deployment",
+      );
+  }
   const origin = outputOrigin(process.env.PORTFOLIO_ORIGIN);
   const { metadata } = releaseInventory(snapshot, origin);
   const localPdf = snapshot.manifest.entries.some(
     ({ kind, assetUrl }) =>
       kind === "pdf" && assetUrl?.startsWith("/content-assets/"),
   );
-  const output = preview ? ".generated/notes-preview" : "dist";
+  const staging = snapshot.workerAssets.length
+    ? await mkdtemp(resolve(".generated/practice-preview-"))
+    : undefined;
+  const output = staging
+    ? join(staging, "pages")
+    : preview
+      ? ".generated/notes-preview"
+      : "dist";
   execFileSync("npm", ["run", "build", "--", "--outDir", output], {
     stdio: "inherit",
     env: {
@@ -39,7 +53,23 @@ try {
   await copyNotesPagesAssets(snapshot, resolve(output));
   for (const [filename, content] of metadata)
     await writeFile(join(output, filename), content, { flag: "wx" });
-  if (!preview) writeSearchInventory(resolve(output), snapshot.receipt, origin);
+  if (!preview || snapshot.receipt.mode === "preview")
+    writeSearchInventory(resolve(output), snapshot.receipt, origin);
+  if (staging) {
+    const receipt = await stagePracticeTraces(
+      snapshot,
+      resolve(output),
+      join(staging, "worker-assets"),
+    );
+    await writeFile(
+      join(staging, "receipt.json"),
+      JSON.stringify(receipt) + "\n",
+      {
+        flag: "wx",
+      },
+    );
+    console.log(JSON.stringify({ practicePreview: staging, ...receipt }));
+  }
 } catch (error) {
   console.error(String(error));
   process.exitCode = 1;

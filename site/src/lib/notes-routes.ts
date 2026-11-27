@@ -104,7 +104,7 @@ export function claimNotesRoutes(
       `Portfolio ${route}`,
       route.endsWith("/") || route.endsWith("/index.html"),
     );
-  if (manifest.entries.length)
+  if (manifest.entries.length || manifest.curriculum.lessons.length)
     for (const { output } of notesLicenseFiles)
       claim("/" + output, "Notes license /" + output, false);
   for (const asset of manifest.assets)
@@ -118,6 +118,8 @@ export function claimNotesRoutes(
   );
   for (const route of organization.routes())
     page(route, `Organization ${route}`);
+  for (const { problemId, route } of manifest.curriculum.lessons)
+    page(route, `Practice lesson ${problemId}`);
   for (const entry of manifest.entries) {
     assertSafePage(entry.route);
     const prefix = isReaderNote(entry) ? "/notes/" : "/resources/";
