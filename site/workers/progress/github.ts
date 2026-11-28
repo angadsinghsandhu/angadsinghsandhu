@@ -193,7 +193,7 @@ export async function githubCallback(request: Request, env: GitHubEnv) {
         code,
         code_verifier: verifier,
       }),
-      redirect: "error",
+      redirect: "manual",
       signal: AbortSignal.timeout(8000),
     });
     const grant = token.ok
@@ -222,7 +222,7 @@ export async function githubCallback(request: Request, env: GitHubEnv) {
         Accept: "application/vnd.github+json",
         "User-Agent": "angadsandhu.dev private progress",
       },
-      redirect: "error",
+      redirect: "manual",
       signal: AbortSignal.timeout(8000),
     });
     if (!response.ok)

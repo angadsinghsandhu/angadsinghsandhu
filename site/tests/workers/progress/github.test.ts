@@ -78,7 +78,7 @@ describe("GitHub owner sign-in", () => {
       authorize.searchParams.get("code_challenge"),
     );
     expect(
-      provider.mock.calls.every(([, init]) => init?.redirect === "error"),
+      provider.mock.calls.every(([, init]) => init?.redirect === "manual"),
     ).toBe(true);
     const cookies = result.headers.getSetCookie();
     expect(cookies.join(" ")).not.toContain("mock-provider-token");
@@ -130,6 +130,21 @@ describe("GitHub owner sign-in", () => {
       (await githubCallback(new Request(latest.callback, { headers }), env))
         .status,
     ).toBe(303);
+  });
+
+  it("rejects a token endpoint redirect without making another request", async () => {
+    const { callback, cookie } = await begin();
+    const provider = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.redirect("https://other.example/"));
+    vi.stubGlobal("fetch", provider);
+    const result = await githubCallback(
+      new Request(callback, { headers: { Cookie: cookie.split(";", 1)[0]! } }),
+      env,
+    );
+    expect(result.status).toBe(403);
+    expect(provider).toHaveBeenCalledTimes(1);
+    expect(provider.mock.calls[0]![1]?.redirect).toBe("manual");
   });
 
   it.each([
