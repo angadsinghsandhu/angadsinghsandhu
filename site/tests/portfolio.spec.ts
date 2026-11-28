@@ -280,3 +280,13 @@ test("the fixture release fetches and plays media only on request", async ({
   await page.getByRole("button", { name: "Close player" }).click();
   await expect(page.locator("iframe")).toHaveCount(0);
 });
+
+test("home features a published project alongside the personal introduction", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const feature = page.getByRole("region", { name: "Featured project" });
+  await expect(
+    feature.getByRole("link", { name: "Dagnam.AI" }),
+  ).toHaveAttribute("href", "/projects/dagnam-ai/");
+});
