@@ -1,6 +1,8 @@
 import { z } from "zod";
-import { releaseArtifactIdentity } from "./release-artifact-download.ts";
-import { practiceBundleProofSchema } from "./release-policy.ts";
+import {
+  releaseArtifactIdentity,
+  releaseReceiptSchema,
+} from "./release-artifact-download.ts";
 
 const id = z.number().int().positive();
 const uuid = z
@@ -11,14 +13,6 @@ const auditText = z
   .max(256)
   .refine((value) => value.trim().length > 0 && !/[\p{Cc}]/u.test(value));
 const commit = releaseArtifactIdentity.shape.portfolioSha;
-const receipt = releaseArtifactIdentity
-  .extend({
-    notesSha: commit,
-    snapshotSchema: id,
-    manifestSha256: releaseArtifactIdentity.shape.archiveSha256,
-    practice: practiceBundleProofSchema.optional(),
-  })
-  .strict();
 const notesProof = z.strictObject({
   repository: z
     .string()
@@ -42,12 +36,12 @@ const rollbackApproval = z.strictObject({
 });
 const release = z.strictObject({
   kind: z.literal("release"),
-  receipt,
+  receipt: releaseReceiptSchema,
   notesProof,
 });
 const rollback = z.strictObject({
   kind: z.literal("rollback"),
-  receipt,
+  receipt: releaseReceiptSchema,
   rollbackApproval,
 });
 const operation = z
