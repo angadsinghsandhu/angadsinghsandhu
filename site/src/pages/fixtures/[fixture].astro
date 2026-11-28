@@ -15,11 +15,13 @@ const { testTone } = await import("../../../tests/fixtures/editorial");
     <title>Playback fixture</title>
   </head>
   <body>
-    <audio
-      controls
-      autoplay
-      aria-label="Fixture track"
-      src={testTone()}
-    ></audio>
+    <button type="button">Play fixture track</button>
+    <audio controls aria-label="Fixture track" src={testTone()}></audio>
   </body>
 </html>
+
+<script>
+  const audio = document.querySelector("audio");
+  const button = document.querySelector("button");
+  button?.addEventListener("click", () => void audio?.play());
+</script>

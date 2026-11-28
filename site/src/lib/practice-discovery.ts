@@ -1,16 +1,21 @@
 import { readPreparedNotesManifest } from "./notes-catalog.ts";
 import type { PortfolioSnapshotV1 } from "./notes-snapshot-v1.ts";
+import { practiceLessonRevision } from "./practice-lessons.ts";
 
 type Curriculum = PortfolioSnapshotV1["curriculum"];
 type Path = Curriculum["paths"][number];
 type Node = Path["nodes"][number];
 
-export type PracticeResult = Curriculum["problems"][number] & { route: string };
+export type PracticeResult = Curriculum["problems"][number] & {
+  route: string;
+  lessonRevision: string;
+};
 type PathTarget = {
   id: string;
   number: number;
   title: string;
   route?: string;
+  lessonRevision?: string;
 };
 type PathNode = Node & { label: string; target?: PathTarget };
 export type PracticeStudyPath = Pick<
@@ -106,7 +111,9 @@ function createStudyPath(
       id: node.problemId,
       title,
       number,
-      ...(problem ? { route: problem.route } : {}),
+      ...(problem
+        ? { route: problem.route, lessonRevision: problem.lessonRevision }
+        : {}),
     };
     nodes.set(node.id, { ...node, label: title, target });
   }
@@ -180,16 +187,22 @@ export function createPracticeDiscovery(manifest?: DiscoveryManifest) {
   const { curriculum, verifiedCurriculumIds } = manifest;
   const verified = new Set(verifiedCurriculumIds);
   const lessons = new Map(
-    curriculum.lessons.map((lesson) => [lesson.problemId, lesson.route]),
+    curriculum.lessons.map((lesson) => [lesson.problemId, lesson]),
   );
   const problems = curriculum.problems
     .flatMap((problem) => {
       const { id, number } = problem;
-      const route = lessons.get(id);
+      const lesson = lessons.get(id);
       return verified.has(number) &&
         id === `leetcode:${number}` &&
-        route === `/practice/leetcode/${number}/`
-        ? [{ ...problem, route }]
+        lesson?.route === `/practice/leetcode/${number}/`
+        ? [
+            {
+              ...problem,
+              route: lesson.route,
+              lessonRevision: practiceLessonRevision(lesson),
+            },
+          ]
         : [];
     })
     .sort((a, b) => a.number - b.number);

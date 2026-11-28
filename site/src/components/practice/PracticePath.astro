@@ -1,4 +1,5 @@
 ---
+import OwnerProgress from "./OwnerProgress.astro";
 import PracticePathNode from "./PracticePathNode.astro";
 import {
   nextPracticeProblem,
@@ -16,6 +17,7 @@ const next = nextPracticeProblem(path);
   <nav aria-label="Practice">
     <a href="/practice/paths/">Study paths</a>
     <a href="/practice/leetcode/">LeetCode practice</a>
+    <OwnerProgress />
   </nav>
   <h1>{path.title}</h1>
   <p>{path.description}</p>
@@ -41,7 +43,7 @@ const next = nextPracticeProblem(path);
   <section aria-labelledby="path-outline-heading">
     <h2 id="path-outline-heading">Ordered outline</h2>
     <ol aria-labelledby="path-outline-heading">
-      {path.outline.map(({ id, number, title, route }) => (
+      {path.outline.map(({ id, number, title, route, lessonRevision }) => (
         <li data-problem-id={id}>
           {route ? (
             <a href={route}>
@@ -52,6 +54,7 @@ const next = nextPracticeProblem(path);
               {number}. {title} <small>Pending</small>
             </span>
           )}
+          {lessonRevision && <OwnerProgress problemId={id} {lessonRevision} />}
         </li>
       ))}
     </ol>

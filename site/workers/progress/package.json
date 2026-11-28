@@ -1,0 +1,6 @@
+{
+  "name": "portfolio-private-progress",
+  "private": true,
+  "type": "module",
+  "main": "index.ts"
+}

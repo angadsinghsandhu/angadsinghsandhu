@@ -3,6 +3,7 @@ import {
   createPracticeDiscovery,
   nextPracticeProblem,
 } from "../src/lib/practice-discovery";
+import { practiceLessonRevision } from "../src/lib/practice-lessons";
 import type { PortfolioSnapshotV1 } from "../src/lib/notes-snapshot-v1";
 
 type Curriculum = PortfolioSnapshotV1["curriculum"];
@@ -80,6 +81,20 @@ function fixture(rootIds: string[], nodes: Node[], id = "sequence") {
 }
 
 describe("practice discovery", () => {
+  it("shares a content revision across cards and paths and changes it when the lesson changes", () => {
+    const manifest = fixture(["one"], [target("one", 1)]);
+    const lesson = manifest.curriculum.lessons[0]!;
+    const revision = practiceLessonRevision(lesson);
+    expect(revision).toMatch(/^[a-f0-9]{64}$/u);
+    const discovery = createPracticeDiscovery(manifest);
+    expect(discovery.problems[0]?.lessonRevision).toBe(revision);
+    expect(discovery.paths[0]?.outline[0]?.lessonRevision).toBe(revision);
+    lesson.bodyHtml += " Revised.";
+    expect(
+      createPracticeDiscovery(manifest).problems[0]?.lessonRevision,
+    ).not.toBe(revision);
+  });
+
   it("lists only eligible numeric lessons and marks pending targets without links", () => {
     const discovery = createPracticeDiscovery(
       fixture(

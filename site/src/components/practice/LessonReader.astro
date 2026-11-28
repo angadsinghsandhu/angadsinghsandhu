@@ -2,9 +2,11 @@
 import "katex/dist/katex.min.css";
 import "../../styles/reader.css";
 import TableOfContents from "../notes/TableOfContents.astro";
+import OwnerProgress from "./OwnerProgress.astro";
 import TracePlayer from "./TracePlayer.astro";
 import {
   numberPracticeCodeLines,
+  practiceLessonRevision,
   preparePracticeProse,
   type PracticeLessonProps,
 } from "../../lib/practice-lessons";
@@ -41,6 +43,11 @@ const headings = [
           Original source · {title}
         </a>
       ))}
+      <OwnerProgress />
+      <OwnerProgress
+        problemId={problem.id}
+        lessonRevision={practiceLessonRevision(lesson)}
+      />
     </div>
   </header>
   <TableOfContents {headings} variant="disclosure" />

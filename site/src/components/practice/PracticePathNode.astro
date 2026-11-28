@@ -1,5 +1,6 @@
 ---
 import type { PracticeStudyPath } from "../../lib/practice-discovery";
+import OwnerProgress from "./OwnerProgress.astro";
 interface Props {
   path: PracticeStudyPath;
   id: string;
@@ -29,6 +30,12 @@ const href = `#path-node-${id}`;
             {node.target.number}. {node.label} <small>Pending</small>
           </span>
         ))}
+      {node.target?.lessonRevision && (
+        <OwnerProgress
+          problemId={node.target.id}
+          lessonRevision={node.target.lessonRevision}
+        />
+      )}
       {(node.kind === "stage" || node.childIds.length > 0) && (
         <details>
           <summary>

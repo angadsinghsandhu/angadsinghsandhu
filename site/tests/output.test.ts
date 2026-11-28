@@ -41,6 +41,7 @@ function rejectArtifact(
   cwd?: string,
   nodeOptions: string[] = [],
   markerNotesSha?: string,
+  progressFlag?: string,
 ) {
   const result = spawnSync(
     process.execPath,
@@ -61,11 +62,13 @@ function rejectArtifact(
         NOTES_REVISION: markerNotesSha,
         GITHUB_RUN_ID: String(candidate.runId),
         GITHUB_RUN_ATTEMPT: String(candidate.runAttempt),
+        PORTFOLIO_PRIVATE_PROGRESS_ENABLED: progressFlag,
       },
     },
   );
   expect(result.status).toBe(1);
   expect(result.stderr).toContain(message);
+  return result.stderr;
 }
 
 test("rejects an over-limit public file", () => {
@@ -189,6 +192,33 @@ test("rejects a missing local fragment", async () => {
     rejectArtifact("Missing local fragment: / → /#missing", workspace);
   });
 });
+
+test.each([
+  ["practice/leetcode/", undefined, false],
+  ["", "true", false],
+  ["practice/leetcode/", "true", true],
+] as const)(
+  "restricts the private Worker link from /%s (flag %s)",
+  async (route, flag, allowed) => {
+    await withProductionSnapshot((workspace) => {
+      mkdirSync(join(output, route), { recursive: true });
+      writeFileSync(
+        join(output, route, "index.html"),
+        '<a href="/account/">Private progress</a><a href="/unexpected/">Missing</a>',
+      );
+      const errors = rejectArtifact(
+        `Missing local target: /${route} → /unexpected/`,
+        workspace,
+        [],
+        undefined,
+        flag,
+      );
+      expect(
+        errors.includes(`Missing local target: /${route} → /account/`),
+      ).toBe(!allowed);
+    });
+  },
+);
 
 test("reserves _redirects for generated rules when there are no aliases", async () => {
   await withProductionSnapshot((workspace) => {

@@ -1,5 +1,6 @@
 ---
 import type { PracticeResult } from "../../lib/practice-discovery";
+import OwnerProgress from "./OwnerProgress.astro";
 
 interface Props {
   problems: PracticeResult[];
@@ -23,6 +24,7 @@ const companies = [
   <h1>LeetCode practice</h1>
   <p>
     <a href="/practice/paths/">Study paths</a>
+    <OwnerProgress />
   </p>
   {problems.length === 0 ? (
     <p>No verified LeetCode lessons are available yet.</p>
@@ -74,7 +76,16 @@ const companies = [
       </p>
       <ul aria-label="Matching lessons">
         {problems.map(
-          ({ id, number, title, topics, difficulty, companies, route }) => (
+          ({
+            id,
+            number,
+            title,
+            topics,
+            difficulty,
+            companies,
+            route,
+            lessonRevision,
+          }) => (
             <li
               data-practice-result
               data-problem-id={id}
@@ -89,6 +100,7 @@ const companies = [
               <a href={route}>
                 {number}. {title}
               </a>
+              <OwnerProgress problemId={id} {lessonRevision} />
               <p>{[label(difficulty), ...topics.map(label)].join(" · ")}</p>
               <p>
                 {companies.length

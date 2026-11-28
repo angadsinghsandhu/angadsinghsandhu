@@ -122,9 +122,17 @@ function checkLinks(
     [...aliases].map(([alias, target]) => [pagePath(alias), pagePath(target)]),
   );
   const failures = new Set<string>();
+  const ownerProgressEnabled =
+    process.env.PORTFOLIO_PRIVATE_PROGRESS_ENABLED === "true";
   for (const [page, { links }] of pages) {
     const route = routeFor(page);
     for (const link of links) {
+      if (
+        ownerProgressEnabled &&
+        route.startsWith("/practice/") &&
+        link === "/account/"
+      )
+        continue;
       const url = new URL(link, origin);
       const pathname = decodeURIComponent(url.pathname);
       const targetPath = files.has(pathname)
