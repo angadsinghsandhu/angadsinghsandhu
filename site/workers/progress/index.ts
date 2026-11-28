@@ -1,16 +1,20 @@
-import { verifyAccess } from "./access.ts";
+import {
+  callbackPath,
+  githubCallback,
+  githubLogin,
+  githubLogout,
+  logoutPath,
+  verifySession,
+  type GitHubEnv,
+} from "./github.ts";
 import {
   createProgressRepository,
   type ProgressDatabase,
   type ProgressRow,
 } from "./repository.ts";
 
-interface ProgressEnv {
+interface ProgressEnv extends GitHubEnv {
   PROGRESS: ProgressDatabase;
-  PRIVATE_ORIGIN: string;
-  ACCESS_ISSUER: string;
-  ACCESS_AUDIENCE: string;
-  ACCESS_OWNER_SUBJECT: string;
 }
 
 type ProgressChange = Parameters<
@@ -130,7 +134,7 @@ ${links ? `<ul>${links}</ul>` : "<p>No lessons marked studied yet.</p>"}
 <nav aria-label="Account actions">
 <a href="/practice/leetcode/">Back to LeetCode practice</a>
 <a href="/api/progress/export/">Download progress (JSON)</a>
-<a href="/cdn-cgi/access/logout">Sign out</a>
+<form action="/account/sign-out/" method="post"><button type="submit">Sign out</button></form>
 </nav>
 </main>
 </body>
@@ -139,7 +143,7 @@ ${links ? `<ul>${links}</ul>` : "<p>No lessons marked studied yet.</p>"}
       headers: privateHeaders({
         "Content-Type": "text/html; charset=utf-8",
         "Content-Security-Policy":
-          "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+          "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
       }),
     },
   );
@@ -152,17 +156,29 @@ export default {
     if (
       url.protocol !== "https:" ||
       url.origin !== env.PRIVATE_ORIGIN ||
-      (path !== apiPath && path !== exportPath && path !== accountPath)
+      ![apiPath, exportPath, accountPath, callbackPath, logoutPath].includes(
+        path,
+      )
     )
       return json({ error: "Not found" }, 404);
 
-    const ownerId = await verifyAccess(request, {
-      issuer: env.ACCESS_ISSUER,
-      audience: env.ACCESS_AUDIENCE,
-      ownerSubject: env.ACCESS_OWNER_SUBJECT,
-    }).catch(() => null);
-    if (!ownerId || ownerId !== env.ACCESS_OWNER_SUBJECT)
-      return json({ error: "Authentication required" }, 401);
+    if (path === callbackPath)
+      return request.method === "GET"
+        ? githubCallback(request, env)
+        : json({ error: "Method not allowed" }, 405, { Allow: "GET" });
+    if (path === logoutPath) {
+      if (request.method !== "POST")
+        return json({ error: "Method not allowed" }, 405, { Allow: "POST" });
+      if (request.headers.get("Origin") !== url.origin)
+        return json({ error: "A same-origin write is required" }, 403);
+      return githubLogout();
+    }
+
+    const ownerId = await verifySession(request, env).catch(() => null);
+    if (!ownerId || ownerId !== env.GITHUB_OWNER_ID)
+      return path === accountPath && request.method === "GET"
+        ? githubLogin(env)
+        : json({ error: "Authentication required" }, 401);
 
     const writing = path === apiPath && request.method === "PUT";
     if (request.method !== "GET" && !writing)
