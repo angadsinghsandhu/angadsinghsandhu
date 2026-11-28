@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { practiceBundleProofSchema } from "./release-policy.ts";
 import { readGitHub } from "./release-source-proof.ts";
 
 const portfolioRepositoryId = 339077137;
@@ -14,6 +15,14 @@ export const releaseArtifactIdentity = z.object({
   artifactId: id,
   archiveSha256: z.string().regex(/^[a-f0-9]{64}(?![\s\S])/u),
 });
+export const releaseReceiptSchema = releaseArtifactIdentity
+  .extend({
+    notesSha: sha,
+    snapshotSchema: id,
+    manifestSha256: releaseArtifactIdentity.shape.archiveSha256,
+    practice: practiceBundleProofSchema.optional(),
+  })
+  .strict();
 const githubArtifact = z.object({
   id,
   name: z.string(),

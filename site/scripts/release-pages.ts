@@ -5,7 +5,7 @@ import { access, lstat, mkdtemp, realpath, rm, stat } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { z } from "zod";
 import { outputOrigin } from "./notes-redirects.ts";
-import { releaseArtifactIdentity } from "./release-artifact-download.ts";
+import { releaseReceiptSchema } from "./release-artifact-download.ts";
 import { verifyReleaseMarker } from "./release-build-marker.ts";
 import type { ReleaseReceipt } from "./release-policy.ts";
 
@@ -28,13 +28,6 @@ const config = z.object({
   origin: z.string(),
   token: z.string().regex(/^[a-zA-Z0-9_-]{1,256}(?![\s\S])/u),
 });
-const receiptSchema = releaseArtifactIdentity
-  .extend({
-    notesSha: releaseArtifactIdentity.shape.portfolioSha,
-    snapshotSchema: z.number().int().positive(),
-    manifestSha256: releaseArtifactIdentity.shape.archiveSha256,
-  })
-  .strict();
 const providerResponse = z.object({
   success: z.literal(true),
   errors: z.array(z.unknown()).length(0),
@@ -342,7 +335,7 @@ export function createReleasePages(
       stage: Stage,
       beforeUpload?: () => Promise<boolean>,
     ): Promise<{ status: "submitted" | "unknown" | "rejected" }> {
-      const receipt = receiptSchema.safeParse(inputReceipt).data;
+      const receipt = releaseReceiptSchema.safeParse(inputReceipt).data;
       if (!receipt || !uuid.safeParse(operationKey).success) return unknown;
       const { directory, executable } = stage;
       try {
@@ -410,7 +403,7 @@ export function createReleasePages(
       operationKey,
       receipt: inputReceipt,
     }: DeployRequest): Promise<Observation> {
-      const receipt = receiptSchema.safeParse(inputReceipt).data;
+      const receipt = releaseReceiptSchema.safeParse(inputReceipt).data;
       if (!receipt || !uuid.safeParse(operationKey).success) return unknown;
       const digest = receiptDigest(receipt);
       const operationMarker = `portfolio:v1:${operationKey}`;
@@ -460,7 +453,7 @@ export function createReleasePages(
       { receipt: inputReceipt }: ReceiptRequest,
       deploymentId: string,
     ): Promise<Observation> {
-      const receipt = receiptSchema.safeParse(inputReceipt).data;
+      const receipt = releaseReceiptSchema.safeParse(inputReceipt).data;
       if (!receipt || !uuid.safeParse(deploymentId).success) return unknown;
       const found = await readExact(receipt, deploymentId, "GET");
       const result = found ? outcome(found) : unknown;
@@ -472,7 +465,7 @@ export function createReleasePages(
       deploymentId: string,
       expectedServingId?: string,
     ): Promise<Observation> {
-      const receipt = receiptSchema.safeParse(inputReceipt).data;
+      const receipt = releaseReceiptSchema.safeParse(inputReceipt).data;
       if (!receipt || !uuid.safeParse(deploymentId).success) return unknown;
       if (
         expectedServingId !== undefined &&

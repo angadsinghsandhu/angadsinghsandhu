@@ -2,8 +2,10 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { outputOrigin } from "./notes-redirects.ts";
-import { releaseArtifactIdentity } from "./release-artifact-download.ts";
-import { practiceBundleProofSchema } from "./release-policy.ts";
+import {
+  releaseArtifactIdentity,
+  releaseReceiptSchema,
+} from "./release-artifact-download.ts";
 import {
   notesJobName,
   notesRepository,
@@ -33,14 +35,6 @@ const environmentId = z
   .regex(/^[1-9][0-9]*(?![\s\S])/u)
   .transform(Number)
   .pipe(id);
-const receiptSchema = releaseArtifactIdentity
-  .extend({
-    notesSha: sha,
-    snapshotSchema: id,
-    manifestSha256: releaseArtifactIdentity.shape.archiveSha256,
-    practice: practiceBundleProofSchema.optional(),
-  })
-  .strict();
 const repositoryIdentity = z.object({
   id: z.literal(portfolio.repository.id),
   full_name: z.literal(portfolio.repository.name),
@@ -112,7 +106,7 @@ function releaseRequest(
       "Release job is outside approved publication configuration",
     );
 
-  const receipt = receiptSchema.parse(
+  const receipt = releaseReceiptSchema.parse(
     JSON.parse(required(env.PORTFOLIO_SELECTED_RECEIPT)),
   );
   const notesRunId = environmentId.parse(env.PORTFOLIO_SELECTED_NOTES_RUN_ID);

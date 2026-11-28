@@ -631,6 +631,57 @@ it("reads the serving ID after loading the retained target and before POST", asy
   ]);
 });
 
+it("uploads and confirms the exact paired Pages and trace receipt", async () => {
+  const receipt = {
+    ...request.receipt,
+    practice: {
+      pagesSha256: "e".repeat(64),
+      workerSha256: "f".repeat(64),
+      workerFiles: 14,
+    },
+  };
+  const paired = { ...request, receipt };
+  const directory = await mkdtemp(
+    join(await realpath(tmpdir()), "pages-assets-"),
+  );
+  try {
+    await writeReleaseMarker(directory, marker);
+    const execute =
+      vi.fn<NonNullable<Parameters<typeof createReleasePages>[0]["execute"]>>();
+    execute.mockResolvedValue(true);
+    let rows: ReturnType<typeof deployment>[] = [];
+    const pages = createReleasePages({
+      ...target,
+      fetch: async (url) =>
+        String(url).includes("/deployments?")
+          ? page(rows)
+          : envelope(approvedProject()),
+      execute,
+    });
+    await expect(
+      pages.deploy(paired, { directory, executable: process.execPath }),
+    ).resolves.toEqual({ status: "submitted" });
+    const args = execute.mock.calls[0][1];
+    const recorded = deployment();
+    recorded.deployment_trigger.metadata.commit_message =
+      args[args.indexOf("--commit-message") + 1];
+    rows = [recorded];
+    await expect(pages.observe(paired)).resolves.toEqual(confirmed);
+    await expect(pages.observe(request)).resolves.toEqual(unknown);
+    await expect(
+      pages.observe({
+        ...paired,
+        receipt: {
+          ...receipt,
+          practice: { ...receipt.practice, workerFiles: 13 },
+        },
+      }),
+    ).resolves.toEqual(unknown);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 it("does not upload when the final source recheck rejects the release", async () => {
   const directory = await mkdtemp(
     join(await realpath(tmpdir()), "pages-assets-"),
