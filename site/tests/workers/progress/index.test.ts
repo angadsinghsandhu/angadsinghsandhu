@@ -1,25 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import worker from "../../../workers/progress/index.ts";
-import { verifyAccess } from "../../../workers/progress/access.ts";
+import {
+  githubLogin,
+  verifySession,
+} from "../../../workers/progress/github.ts";
 import {
   createProgressRepository,
   type ProgressDatabase,
 } from "../../../workers/progress/repository.ts";
 
-vi.mock("../../../workers/progress/access.ts", () => ({
-  verifyAccess: vi.fn(),
-}));
+vi.mock("../../../workers/progress/github.ts", { spy: true });
 vi.mock("../../../workers/progress/repository.ts", () => ({
   createProgressRepository: vi.fn(),
 }));
 
 const origin = "https://portfolio.example";
-const owner = "private-owner-subject";
+const owner = "55819847";
 const env = {
   PRIVATE_ORIGIN: origin,
-  ACCESS_ISSUER: "https://identity.example",
-  ACCESS_AUDIENCE: "expected-audience",
-  ACCESS_OWNER_SUBJECT: owner,
+  GITHUB_CLIENT_ID: "app-id",
+  GITHUB_CLIENT_SECRET: "example-secret-value",
+  GITHUB_OWNER_ID: owner,
   PROGRESS: { prepare: vi.fn<ProgressDatabase["prepare"]>() },
 };
 const change = {
@@ -42,7 +43,7 @@ const repository = {
 
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(verifyAccess).mockResolvedValue(owner);
+  vi.mocked(verifySession).mockResolvedValue(owner);
   vi.mocked(createProgressRepository).mockReturnValue(repository);
   repository.list.mockResolvedValue([row]);
   repository.save.mockResolvedValue({ kind: "saved", row });
@@ -78,18 +79,14 @@ describe("private progress route", () => {
       expect(response.status).toBe(404);
       expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     }
-    expect(verifyAccess).not.toHaveBeenCalled();
+    expect(verifySession).not.toHaveBeenCalled();
     expect(createProgressRepository).not.toHaveBeenCalled();
   });
 
   it("blocks unsigned and wrong-owner credentials before all routes including export", async () => {
     for (const subject of [null, "someone-else"]) {
-      vi.mocked(verifyAccess).mockResolvedValue(subject);
-      for (const path of [
-        "/account/",
-        "/api/progress/",
-        "/api/progress/export/",
-      ]) {
+      vi.mocked(verifySession).mockResolvedValue(subject);
+      for (const path of ["/api/progress/", "/api/progress/export/"]) {
         const response = await request(path);
         expect(response.status).toBe(401);
         expect(response.headers.get("Cache-Control")).toBe("private, no-store");
@@ -104,11 +101,7 @@ describe("private progress route", () => {
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
     expect(await response.json()).toEqual({ version: 1, rows: [row] });
-    expect(verifyAccess).toHaveBeenCalledWith(expect.any(Request), {
-      issuer: env.ACCESS_ISSUER,
-      audience: env.ACCESS_AUDIENCE,
-      ownerSubject: owner,
-    });
+    expect(verifySession).toHaveBeenCalledWith(expect.any(Request), env);
     expect(repository.list).toHaveBeenCalledWith(owner);
     const exported = await request("/api/progress/export/");
     expect(exported.headers.get("Content-Disposition")).toBe(
@@ -128,7 +121,7 @@ describe("private progress route", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toMatch(/text\/html/);
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
-    expect(html).toContain('href="/cdn-cgi/access/logout"');
+    expect(html).toContain('action="/account/sign-out/"');
     expect(html).toContain('href="/api/progress/export/"');
     expect(html).not.toContain(owner);
     expect(html).not.toContain(row.lessonRevision);
@@ -138,6 +131,30 @@ describe("private progress route", () => {
     expect(html).not.toContain('href="/practice/leetcode/2/"');
     expect(html).not.toContain("<script>");
     expect(repository.list).toHaveBeenCalledWith(owner);
+  });
+
+  it("starts sign-in only on the account page and clears the session on same-origin sign-out", async () => {
+    vi.mocked(verifySession).mockResolvedValue(null);
+    const login = await request("/account/");
+    expect(login.status).toBe(303);
+    expect(login.headers.get("Location")).toMatch(
+      /^https:\/\/github\.com\/login\/oauth\/authorize/u,
+    );
+    expect(githubLogin).toHaveBeenCalledWith(env);
+    expect((await request("/account/sign-out/")).status).toBe(405);
+    expect(
+      (await request("/account/sign-out/", { method: "POST" })).status,
+    ).toBe(403);
+    const logout = await request("/account/sign-out/", {
+      method: "POST",
+      headers: { Origin: origin },
+    });
+    expect(logout.status).toBe(303);
+    expect(logout.headers.get("Location")).toBe("/practice/leetcode/");
+    expect(logout.headers.getSetCookie().join(" ")).toContain(
+      "__Host-portfolio-session=;",
+    );
+    expect(createProgressRepository).not.toHaveBeenCalled();
   });
 
   it("allows only supported methods after authentication", async () => {
